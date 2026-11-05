@@ -46,7 +46,7 @@ export function App() {
             </span>
           </Link>
           <nav className="flex items-center gap-1">
-            {nav("/", "Entries", path === "/" || path.startsWith("/entry"))}
+            {nav("/", "Dashboard", path === "/" || path.startsWith("/entry"))}
             {nav("/settings", "Settings", path.startsWith("/settings"))}
           </nav>
         </div>

@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from "react";
-import { currentMonthDenver, formatDate, isValidMonth, monthLabel, shiftMonth } from "../../shared/dates";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { countByDepartment, type EmployeeTotal } from "../../shared/dashboard";
+import { currentMonthDenver, isValidMonth, monthLabel, shiftMonth } from "../../shared/dates";
 import type { Review } from "../../shared/schemas";
 import { formatCents } from "../../shared/text";
 import { api } from "../api";
-import { EmployeeChip } from "../components/EmployeePicker";
-import { Banner, Button, Card, EmptyState, Modal, Spinner } from "../components/ui";
+import { DepartmentTiles, Leaderboard, ReviewLog, TotalCallout } from "../components/dashboard";
+import { Banner, Button, Card, Modal, Spinner } from "../components/ui";
+import { useDirectory } from "../directory";
 import { cx } from "../lib";
 import { useRouter } from "../router";
 
@@ -14,7 +16,7 @@ interface MonthData {
   summary: {
     count: number;
     total_cents: number;
-    per_employee: { employee_id: number; name: string; department: string; mentions: number; total_cents: number }[];
+    per_employee: EmployeeTotal[];
   };
 }
 
@@ -56,6 +58,13 @@ export function Home() {
 
   const go = (m: string) => navigate(`/?month=${m}`);
 
+  const { departments } = useDirectory();
+  const deptCounts = useMemo(
+    () => countByDepartment(data?.reviews ?? [], [...departments].sort((a, b) => a.sort_order - b.sort_order).map((d) => d.name)),
+    [data, departments],
+  );
+  const multiDept = !!data && deptCounts.reduce((a, b) => a + b.count, 0) > data.summary.count;
+
   return (
     <div className="pb-28 lg:pb-8">
       {/* Month switcher */}
@@ -71,7 +80,7 @@ export function Home() {
         </Button>
         <div className="hidden lg:block">
           <Button variant="primary" size="lg" onClick={() => navigate("/new")}>
-            + Add New
+            + Add Review
           </Button>
         </div>
       </div>
@@ -97,29 +106,32 @@ export function Home() {
       )}
 
       {data && (
-        <>
-          <Card className="mb-4">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p className="text-sm text-stone-500">{data.summary.count} entr{data.summary.count === 1 ? "y" : "ies"}</p>
-                <p className="text-3xl font-bold tabular-nums text-brand">{formatCents(data.summary.total_cents)}</p>
-                <p className="text-xs text-stone-500">spiffs for {monthLabel(month)} (by posted date)</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <a className="inline-flex min-h-11 items-center rounded-xl bg-white px-3 text-sm font-medium ring-1 ring-stone-300 hover:bg-stone-50" href={`/api/export?month=${month}&kind=mentions`} download>
-                  Export CSV
-                </a>
-                <a className="inline-flex min-h-11 items-center rounded-xl bg-white px-3 text-sm font-medium ring-1 ring-stone-300 hover:bg-stone-50" href={`/api/export?month=${month}&kind=totals`} download>
-                  Totals CSV
-                </a>
-              </div>
-            </div>
-            {data.summary.per_employee.length > 0 && (
-              <div className="mt-3 border-t border-stone-100 pt-2">
-                <button type="button" className="flex min-h-11 w-full items-center justify-between text-left font-medium" onClick={() => setShowTotals((s) => !s)} aria-expanded={showTotals}>
-                  Per-employee totals ({data.summary.per_employee.length})<span className="text-stone-400">{showTotals ? "▴" : "▾"}</span>
-                </button>
-                {showTotals && (
+        <div className="space-y-4">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+            <TotalCallout
+              count={data.summary.count}
+              periodLabel={month === currentMonthDenver() ? "This Month" : monthLabel(month)}
+              spiffText={`${formatCents(data.summary.total_cents)} in spiffs`}
+            />
+            <DepartmentTiles items={deptCounts} />
+          </div>
+          {multiDept && <p className="-mt-2 px-1 text-xs text-stone-500">A review that names people from more than one department counts in each, so the department numbers can add up to more than the total.</p>}
+
+          <Leaderboard people={data.summary.per_employee} monthTitle={monthLabel(month)} />
+
+          <ReviewLog reviews={data.reviews} monthTitle={monthLabel(month)} highlight={highlight} hlRef={hlRef} onOpen={(id) => navigate(`/entry/${id}`)} />
+
+          {/* Spiff dollars live here, out of the way: payouts per person and the CSV exports. */}
+          <Card>
+            <button type="button" className="flex min-h-11 w-full items-center justify-between text-left font-semibold" onClick={() => setShowTotals((s) => !s)} aria-expanded={showTotals}>
+              <span>
+                Spiff payouts <span className="font-normal text-stone-500">· {formatCents(data.summary.total_cents)}</span>
+              </span>
+              <span className="text-stone-400">{showTotals ? "▴" : "▾"}</span>
+            </button>
+            {showTotals && (
+              <div className="mt-2 border-t border-stone-100 pt-2">
+                {data.summary.per_employee.length > 0 ? (
                   <ul className="divide-y divide-stone-100">
                     {data.summary.per_employee.map((p) => (
                       <li key={p.employee_id} className="flex items-center justify-between gap-3 py-2">
@@ -133,60 +145,27 @@ export function Home() {
                       </li>
                     ))}
                   </ul>
+                ) : (
+                  <p className="py-2 text-sm text-stone-500">No spiffs this month.</p>
                 )}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <a className="inline-flex min-h-11 items-center rounded-xl bg-white px-3 text-sm font-medium ring-1 ring-stone-300 hover:bg-stone-50" href={`/api/export?month=${month}&kind=mentions`} download>
+                    Export CSV
+                  </a>
+                  <a className="inline-flex min-h-11 items-center rounded-xl bg-white px-3 text-sm font-medium ring-1 ring-stone-300 hover:bg-stone-50" href={`/api/export?month=${month}&kind=totals`} download>
+                    Totals CSV
+                  </a>
+                </div>
               </div>
             )}
           </Card>
-
-          {data.reviews.length === 0 ? (
-            <EmptyState title="No entries yet">
-              Tap <strong>Add New</strong> to paste a review.
-            </EmptyState>
-          ) : (
-            <ul className="space-y-3">
-              {data.reviews.map((r) => (
-                <li key={r.id}>
-                  <button
-                    type="button"
-                    ref={r.id === highlight ? hlRef : undefined}
-                    onClick={() => navigate(`/entry/${r.id}`)}
-                    className={cx(
-                      "w-full rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-stone-200 transition hover:ring-brand/40",
-                      r.id === highlight && "flash ring-2 ring-gold",
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-lg font-semibold">{r.customer_name}</p>
-                        <p className="text-sm text-stone-500">
-                          {formatDate(r.posted_date)}
-                          {r.star_rating ? <span className="ml-2 text-gold">{"★".repeat(r.star_rating)}</span> : null}
-                          {r.needs_attention && <span className="ml-2 rounded bg-red-100 px-1.5 text-xs font-semibold text-red-800">Attention</span>}
-                        </p>
-                      </div>
-                      <p className="text-xl font-bold tabular-nums">{formatCents(r.total_cents)}</p>
-                    </div>
-                    {r.mentions.length > 0 ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {r.mentions.map((m) => (
-                          <EmployeeChip key={m.id} name={m.employee_name_snapshot} department={m.department_name_snapshot} amount={formatCents(m.amount_cents)} />
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="mt-2 text-sm text-stone-500">No employees mentioned</p>
-                    )}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
+        </div>
       )}
 
       {/* Phone: big sticky Add New */}
       <div className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white/95 px-3 pt-3 backdrop-blur lg:hidden">
         <Button variant="primary" size="xl" className="w-full" onClick={() => navigate("/new")}>
-          + Add New
+          + Add Review
         </Button>
       </div>
 
