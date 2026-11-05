@@ -1,43 +1,13 @@
 import { useMemo, useState, type ReactNode, type Ref } from "react";
-import { donutSlices, groupOfDepartment, rankByReviews, departmentsOfReview, type DepartmentBar, type EmployeeTotal, type GroupKey } from "../../shared/dashboard";
+import { donutSlices, rankByReviews, departmentsOfReview, type DepartmentBar, type EmployeeTotal } from "../../shared/dashboard";
 import { formatDate } from "../../shared/dates";
 import type { Review } from "../../shared/schemas";
 import { cx, deptAccent, deptClasses } from "../lib";
+import { DepartmentIcon } from "./DepartmentIcons";
 import { Button, EmptyState, Modal } from "./ui";
 
 // ---------- Icons (inline so there is nothing extra to load) ----------
 const svgProps = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
-
-function GroupIcon({ group, className }: { group: GroupKey; className?: string }) {
-  switch (group) {
-    case "plumbing":
-      return (
-        <svg {...svgProps} className={className}>
-          <path d="M12 3s6 6.2 6 10.5A6 6 0 0 1 6 13.5C6 9.2 12 3 12 3z" />
-        </svg>
-      );
-    case "hvac":
-      return (
-        <svg {...svgProps} className={className}>
-          <path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9" />
-        </svg>
-      );
-    case "install":
-      return (
-        <svg {...svgProps} className={className}>
-          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-        </svg>
-      );
-    default:
-      return (
-        <svg {...svgProps} fill="currentColor" strokeWidth={0} className={className}>
-          <circle cx="5" cy="12" r="2" />
-          <circle cx="12" cy="12" r="2" />
-          <circle cx="19" cy="12" r="2" />
-        </svg>
-      );
-  }
-}
 
 function ReviewBubbleIcon({ className }: { className?: string }) {
   return (
@@ -68,7 +38,7 @@ function ListIcon({ className }: { className?: string }) {
 export function DeptChip({ name, className }: { name: string; className?: string }) {
   return (
     <span className={cx("inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[13px] leading-5 font-bold whitespace-nowrap ring-1", deptClasses(name), className)}>
-      <GroupIcon group={groupOfDepartment(name)} className="size-3.5 shrink-0" />
+      <DepartmentIcon department={name} className="size-3.5 shrink-0" />
       {name}
     </span>
   );
@@ -126,7 +96,7 @@ export function DepartmentGallery({ bars }: { bars: DepartmentBar[] }) {
         return (
           <li key={d.name} className="flex items-center gap-3.5 rounded-2xl bg-white p-4 shadow-card ring-1 ring-stone-900/5">
             <span className={cx("grid size-11 shrink-0 place-items-center rounded-xl", accent.tile)}>
-              <GroupIcon group={groupOfDepartment(d.name)} className="size-6" />
+              <DepartmentIcon department={d.name} className="size-6" />
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-3">
