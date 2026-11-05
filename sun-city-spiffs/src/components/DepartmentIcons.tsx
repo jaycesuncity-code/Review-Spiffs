@@ -19,7 +19,6 @@ const COLORS = {
   hvacDeep: "#9B1C1C",
   construction: "#E07B1A",
   plumbingLight: "#3A9AD9",
-  heater: "#5B6B7C",
   office: "#6B7280",
   maroon: "#7A1F35",
   fallback: "#78716C",
@@ -41,7 +40,7 @@ function Svg({ className, title, color, children }: DeptIconProps & { color: str
 }
 
 // Small shared wrench shape (open-end + ring), drawn as a stroke in its own local space.
-// Used by Plumbing Service/Install and HVAC Service/Install so they share one recognizable glyph.
+// Used by Plumbing Service, HVAC Service and HVAC Install so they share one recognizable glyph.
 const WRENCH_D = "M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z";
 
 // ---------- Managers: gold crown with jewels ----------
@@ -126,19 +125,12 @@ export function PlumbingServiceIcon(props: DeptIconProps) {
   );
 }
 
-// ---------- Plumbing Install: elbowed pipe run + small light-blue wrench ----------
+// ---------- Plumbing Install: light-blue house + white water droplet ----------
 export function PlumbingInstallIcon(props: DeptIconProps) {
   return (
-    <Svg {...props} color={COLORS.heater}>
-      <g fill="currentColor">
-        <path d="M3.6 5.4h14.2v14.4" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinejoin="round" />
-        <rect x="14.9" y="2.5" width="5.8" height="5.8" rx="1.4" />
-        <rect x="8.3" y="2.7" width="3.4" height="5.4" rx="0.8" />
-        <rect x="1.6" y="2.3" width="2.4" height="6.2" rx="0.8" />
-        <rect x="14.7" y="19.4" width="6.2" height="2.4" rx="0.8" />
-        <rect x="15.1" y="11.4" width="5.4" height="3.4" rx="0.8" />
-      </g>
-      <path d={WRENCH_D} transform="translate(1.6 9.6) scale(0.52)" fill={COLORS.plumbingLight} stroke={COLORS.plumbingLight} strokeWidth="2.6" strokeLinejoin="round" />
+    <Svg {...props} color={COLORS.plumbingLight}>
+      <path d="M2.6 11.4 11 3.9a1.5 1.5 0 0 1 2 0l8.4 7.5H19.6V20a1.5 1.5 0 0 1-1.5 1.5H5.9A1.5 1.5 0 0 1 4.4 20v-8.6z" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" />
+      <path d="M12 9.6c2.3 2.6 3.4 4.3 3.4 5.8a3.4 3.4 0 0 1-6.8 0c0-1.5 1.1-3.2 3.4-5.8z" fill="#fff" />
     </Svg>
   );
 }
