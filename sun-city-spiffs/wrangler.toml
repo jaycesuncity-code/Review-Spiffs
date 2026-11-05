@@ -27,11 +27,9 @@ migrations_dir = "migrations"
 
 [vars]
 ENVIRONMENT = "production"
-# Your Zero Trust team domain, e.g. "https://suncity.cloudflareaccess.com"
-CF_ACCESS_TEAM_DOMAIN = ""
-# The Access application's AUD tag. Comma-separate if more than one Access app points here
-# (for example workers.dev and a custom domain).
-CF_ACCESS_AUD = ""
+CF_ACCESS_TEAM_DOMAIN = "https://suncitylc.cloudflareaccess.com"
+# CF_ACCESS_AUD is stored as an encrypted Worker secret in the Cloudflare dashboard.
+# Do NOT add CF_ACCESS_AUD to [vars]; a var with the same name conflicts with the secret.
 
 [observability]
 enabled = true
