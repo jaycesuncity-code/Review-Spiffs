@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #6b1a2c;
+  --color-brand-dark: #4e1320;
+  --color-brand-light: #f6e9ec;
+  --color-gold: #c9a84c;
+  --color-gold-light: #f7efd9;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  overscroll-behavior-y: none;
+}
+
+/* iOS zooms inputs under 16px; keep form text at 16px on phones. */
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+
+.pb-safe {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+@keyframes flash {
+  0% { box-shadow: 0 0 0 0 rgb(201 168 76 / 0.9); }
+  100% { box-shadow: 0 0 0 14px rgb(201 168 76 / 0); }
+}
+
+.flash {
+  animation: flash 1.2s ease-out 3;
+}
