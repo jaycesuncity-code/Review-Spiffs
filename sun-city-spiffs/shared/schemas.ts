@@ -76,6 +76,21 @@ export const AnalyzeBody = z.object({
   posted_date: DateStr,
 });
 
+/** A rewrite changes only the company reply; it never reruns review or employee analysis. */
+export const RewriteBody = z.object({
+  request_id: Uuid,
+  review_raw: z.string().trim().min(1).max(20000),
+  posted_date: DateStr,
+  current_reply: z.string().max(3000),
+  instructions: z.string().trim().max(2000).default(""),
+});
+export const RewriteResult = z.object({
+  request_id: z.string(),
+  reply_text: z.string(),
+  length_target: z.string(),
+});
+export type RewriteResult = z.infer<typeof RewriteResult>;
+
 export const EmployeeLite = z.object({
   id: z.number(),
   full_name: z.string(),

@@ -42,16 +42,15 @@ export async function api<T>(path: string, opts: Opts = {}): Promise<T> {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * POST /api/analyze with the same request_id for automatic retries:
- * - one retry after a network failure
- * - polls while the server says the same request is still in progress
+ * Use the same request_id for transient network errors and pending server requests.
+ * Both endpoints share the backend's per-user AI request rate limit.
  */
-export async function analyzeWithRetry<T>(body: { request_id: string; review_raw: string; posted_date: string }): Promise<T> {
+async function postAiWithRetry<T>(path: string, body: unknown): Promise<T> {
   let networkRetried = false;
   const started = Date.now();
   for (;;) {
     try {
-      return await api<T>("/api/analyze", { method: "POST", body });
+      return await api<T>(path, { method: "POST", body });
     } catch (e) {
       if (e instanceof ApiError && e.status === 0 && !networkRetried) {
         networkRetried = true;
@@ -65,4 +64,12 @@ export async function analyzeWithRetry<T>(body: { request_id: string; review_raw
       throw e;
     }
   }
+}
+
+export function analyzeWithRetry<T>(body: { request_id: string; review_raw: string; posted_date: string }): Promise<T> {
+  return postAiWithRetry<T>("/api/analyze", body);
+}
+
+export function rewriteWithRetry<T>(body: { request_id: string; review_raw: string; posted_date: string; current_reply: string; instructions: string }): Promise<T> {
+  return postAiWithRetry<T>("/api/rewrite", body);
 }

@@ -1,5 +1,6 @@
 import { todayDenver } from "../shared/dates";
 import { handleAnalyze } from "./analyze";
+import { handleRewrite } from "./rewrite";
 import { authenticate } from "./auth";
 import { getSettings } from "./db";
 import type { Env } from "./env";
@@ -40,6 +41,7 @@ const routes: [string, RegExp, Handler][] = [
   ["PUT", /^\/api\/reviews\/(\d+)$/, async (c) => json(await updateReview(c.env, c.user, parseId(c.params[0]), await body(c)))],
   ["DELETE", /^\/api\/reviews\/(\d+)$/, async (c) => json(await deleteReview(c.env, c.user, parseId(c.params[0])))],
   ["POST", /^\/api\/analyze$/, async (c) => json(await handleAnalyze(c.env, c.user, await body(c)))],
+  ["POST", /^\/api\/rewrite$/, async (c) => json(await handleRewrite(c.env, c.user, await body(c)))],
   ["POST", /^\/api\/calc$/, async (c) => json(await calcPreview(c.env, await body(c)))],
   ["GET", /^\/api\/export$/, async (c) => exportCsv(c.env.DB, c.url.searchParams.get("month") ?? "", c.url.searchParams.get("kind") ?? "mentions")],
 

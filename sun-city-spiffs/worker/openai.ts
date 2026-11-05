@@ -40,6 +40,16 @@ export const RESPONSE_SCHEMA = {
   },
 } as const;
 
+/** A lighter structured output for reply-only regeneration. */
+export const REWRITE_RESPONSE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["reply_text"],
+  properties: {
+    reply_text: { type: "string", description: "The revised public company reply, plain text." },
+  },
+} as const;
+
 export interface OpenAiUsage {
   input_tokens: number;
   output_tokens: number;
@@ -55,6 +65,7 @@ export interface OpenAiCall {
   reasoningEffort: string; // "" = do not send
   system: string;
   user: string;
+  responseSchema?: typeof RESPONSE_SCHEMA | typeof REWRITE_RESPONSE_SCHEMA;
   timeoutMs?: number;
   fetchFn?: typeof fetch;
 }
@@ -73,7 +84,7 @@ export async function callOpenAI(c: OpenAiCall): Promise<OpenAiResult> {
       { role: "system", content: c.system },
       { role: "user", content: c.user },
     ],
-    text: { format: { type: "json_schema", name: "review_analysis", strict: true, schema: RESPONSE_SCHEMA } },
+    text: { format: { type: "json_schema", name: c.responseSchema ? "review_rewrite" : "review_analysis", strict: true, schema: c.responseSchema ?? RESPONSE_SCHEMA } },
     max_output_tokens: 6000,
     store: false,
   };

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { formatDate, isValidDate } from "../../shared/dates";
 import { firstName, nameTokens, normalizeName } from "../../shared/names";
-import type { AnalyzeResult, CalcResult, DuplicateMatch, EmployeeLite, Review } from "../../shared/schemas";
+import type { AnalyzeResult, CalcResult, DuplicateMatch, EmployeeLite, Review, RewriteResult } from "../../shared/schemas";
 import { formatCents, wordCount } from "../../shared/text";
-import { analyzeWithRetry, api, ApiError } from "../api";
+import { api, ApiError, rewriteWithRetry } from "../api";
 import { useDirectory } from "../directory";
 import { cx, uuid } from "../lib";
 import { Link } from "../router";
@@ -153,6 +153,8 @@ export function ReviewEditor({ mode, initial, saveKey, reviewId, expectedUpdated
   const [calcError, setCalcError] = useState<string | null>(null);
   const [picker, setPicker] = useState<{ rowKey: string | null; query: string } | null>(null);
   const [regenBusy, setRegenBusy] = useState(false);
+  const [regenModal, setRegenModal] = useState(false);
+  const [regenInstructions, setRegenInstructions] = useState("");
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const [dupModal, setDupModal] = useState<DuplicateMatch[] | null>(null);
@@ -255,13 +257,27 @@ export function ReviewEditor({ mode, initial, saveKey, reviewId, expectedUpdated
   for (const m of unresolved) blockers.push(`Choose who “${m.mention_text ?? "?"}” is, or tap Ignore.`);
 
   // ---------- Actions ----------
+  const openRewrite = () => {
+    setRegenInstructions("");
+    setRegenModal(true);
+  };
+
   const regenerate = async () => {
+    if (regenBusy) return;
     const raw = d.review_raw.trim() || d.review_text.trim();
     if (!raw) return toast("There is no review text to generate from.", "error");
     setRegenBusy(true);
     try {
-      const r = await analyzeWithRetry<AnalyzeResult>({ request_id: uuid(), review_raw: raw, posted_date: isValidDate(d.posted_date) ? d.posted_date : new Date().toISOString().slice(0, 10) });
+      const r = await rewriteWithRetry<RewriteResult>({
+        request_id: uuid(),
+        review_raw: raw,
+        posted_date: isValidDate(d.posted_date) ? d.posted_date : new Date().toISOString().slice(0, 10),
+        current_reply: d.reply_final_text,
+        instructions: regenInstructions,
+      });
       update({ reply_final_text: r.reply_text, reply_ai_text: r.reply_text, length_target: r.length_target });
+      setRegenModal(false);
+      setRegenInstructions("");
       toast("New reply generated");
     } catch (e) {
       toast(e instanceof Error ? e.message : "Could not regenerate", "error");
@@ -336,7 +352,7 @@ export function ReviewEditor({ mode, initial, saveKey, reviewId, expectedUpdated
       className="order-1"
       title="Company reply"
       actions={
-        <Button size="sm" onClick={regenerate} disabled={regenBusy}>
+        <Button size="sm" onClick={openRewrite} disabled={regenBusy}>
           {regenBusy ? <Spinner /> : "↻"} Regenerate
         </Button>
       }
@@ -584,6 +600,44 @@ export function ReviewEditor({ mode, initial, saveKey, reviewId, expectedUpdated
         onClose={() => setPicker(null)}
         onPick={pick}
       />
+
+      <Modal
+        open={regenModal}
+        onClose={() => { if (!regenBusy) setRegenModal(false); }}
+        title="Refine company reply"
+        footer={
+          <>
+            <Button onClick={() => setRegenModal(false)} disabled={regenBusy}>Cancel</Button>
+            <Button variant="primary" onClick={regenerate} disabled={regenBusy}>
+              {regenBusy && <Spinner />} Generate new reply
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <div>
+            <p className="mb-1 text-sm font-medium text-stone-700">Current reply (for reference)</p>
+            <div className="max-h-48 min-h-20 overflow-y-auto whitespace-pre-wrap break-words rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-800">
+              {d.reply_final_text || "(No reply yet)"}
+            </div>
+          </div>
+          <div>
+            <label htmlFor="regen-instructions" className="mb-1 block text-sm font-medium text-stone-700">
+              Additional instructions (optional)
+            </label>
+            <textarea
+              id="regen-instructions"
+              className={cx(inputCls, "min-h-32 leading-relaxed")}
+              value={regenInstructions}
+              onChange={(e) => setRegenInstructions(e.target.value)}
+              maxLength={2000}
+              disabled={regenBusy}
+              placeholder="E.g. Make it more personal, cut the generic opening, and keep the employee names."
+            />
+            <p className="mt-1 text-xs text-stone-500">Leave blank for a fresh alternative. Your saved instructions remain unchanged.</p>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         open={!!dupModal}
