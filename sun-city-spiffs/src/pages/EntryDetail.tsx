@@ -3,7 +3,7 @@ import { formatDate } from "../../shared/dates";
 import type { Review } from "../../shared/schemas";
 import { api } from "../api";
 import { draftFromReview, ReviewEditor } from "../components/ReviewEditor";
-import { Banner, Spinner, useToast } from "../components/ui";
+import { Banner, PageTitle, Spinner, useToast } from "../components/ui";
 import { useRouter } from "../router";
 
 export function EntryDetail({ id }: { id: number }) {
@@ -29,12 +29,15 @@ export function EntryDetail({ id }: { id: number }) {
 
   return (
     <div>
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold">{review.customer_name}</h1>
-        <p className="text-sm text-stone-500">
-          Posted {formatDate(review.posted_date)} · added by {review.created_by} · last edited by {review.updated_by} {new Date(review.updated_at).toLocaleString()}
-        </p>
-      </div>
+      <PageTitle
+        sub={
+          <>
+            Posted {formatDate(review.posted_date)} · added by {review.created_by} · last edited by {review.updated_by} {new Date(review.updated_at).toLocaleString()}
+          </>
+        }
+      >
+        {review.customer_name}
+      </PageTitle>
       <ReviewEditor
         key={review.updated_at}
         mode="edit"

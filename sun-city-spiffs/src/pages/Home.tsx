@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { countByDepartment, type EmployeeTotal } from "../../shared/dashboard";
+import { countByDepartment, departmentBars, type EmployeeTotal } from "../../shared/dashboard";
 import { currentMonthDenver, isValidMonth, monthLabel, shiftMonth } from "../../shared/dates";
 import type { Review } from "../../shared/schemas";
 import { formatCents } from "../../shared/text";
 import { api } from "../api";
-import { DepartmentTiles, Leaderboard, ReviewLog, TotalCallout } from "../components/dashboard";
+import { DepartmentGallery, Leaderboard, ReviewLog, TotalCallout } from "../components/dashboard";
 import { Banner, Button, Card, Modal, Spinner } from "../components/ui";
 import { useDirectory } from "../directory";
 import { cx } from "../lib";
@@ -63,17 +63,19 @@ export function Home() {
     () => countByDepartment(data?.reviews ?? [], [...departments].sort((a, b) => a.sort_order - b.sort_order).map((d) => d.name)),
     [data, departments],
   );
+  // Display only: departments with no reviews this month are hidden from the gallery (they stay in the directory and everywhere else).
+  const bars = useMemo(() => departmentBars(deptCounts), [deptCounts]);
   const multiDept = !!data && deptCounts.reduce((a, b) => a + b.count, 0) > data.summary.count;
 
   return (
     <div className="pb-28 lg:pb-8">
       {/* Month switcher */}
-      <div className="mb-4 flex items-center justify-between gap-2">
+      <div className="mb-5 flex items-center justify-between gap-2">
         <Button aria-label="Previous month" onClick={() => go(shiftMonth(month, -1))} className="w-12">
           ‹
         </Button>
-        <button type="button" className="min-h-11 flex-1 rounded-xl px-3 text-center text-xl font-bold hover:bg-white" onClick={() => setMonthMenu(true)}>
-          {monthLabel(month)} <span className="text-base text-stone-400">▾</span>
+        <button type="button" className="min-h-11 flex-1 rounded-xl px-3 text-center text-2xl font-extrabold tracking-tight hover:bg-white" onClick={() => setMonthMenu(true)}>
+          {monthLabel(month)} <span className="text-base text-brand">▾</span>
         </button>
         <Button aria-label="Next month" onClick={() => go(shiftMonth(month, 1))} className="w-12">
           ›
@@ -106,16 +108,16 @@ export function Home() {
       )}
 
       {data && (
-        <div className="space-y-4">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <div className="space-y-5">
+          <div className={cx("grid gap-3", bars.length > 0 && "lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]")}>
             <TotalCallout
               count={data.summary.count}
               periodLabel={month === currentMonthDenver() ? "This Month" : monthLabel(month)}
               spiffText={`${formatCents(data.summary.total_cents)} in spiffs`}
             />
-            <DepartmentTiles items={deptCounts} />
+            <DepartmentGallery bars={bars} />
           </div>
-          {multiDept && <p className="-mt-2 px-1 text-xs text-stone-500">A review that names people from more than one department counts in each, so the department numbers can add up to more than the total.</p>}
+          {multiDept && <p className="-mt-2 px-1 text-sm text-stone-500">A review that names people from more than one department counts in each, so the department numbers can add up to more than the total.</p>}
 
           <Leaderboard people={data.summary.per_employee} monthTitle={monthLabel(month)} />
 

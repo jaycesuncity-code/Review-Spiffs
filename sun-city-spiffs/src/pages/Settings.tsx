@@ -5,7 +5,7 @@ import type { Settings as SettingsT, SpiffType } from "../../shared/schemas";
 import { formatCents, pickBucket, wordCount, type LengthBucket } from "../../shared/text";
 import { api, ApiError } from "../api";
 import { AddEmployeeModal, EmployeeChip } from "../components/EmployeePicker";
-import { Banner, Button, Card, Confirm, EmptyState, Field, inputCls, Modal, Spinner, useToast } from "../components/ui";
+import { Banner, Button, Card, Confirm, EmptyState, Field, inputCls, Modal, PageTitle, Spinner, useToast } from "../components/ui";
 import { useDirectory, type DirEmployee } from "../directory";
 import { cx } from "../lib";
 import { useRouter } from "../router";
@@ -24,9 +24,9 @@ export function Settings({ tab }: { tab: string }) {
   const current: Tab = (TABS.find(([k]) => k === tab)?.[0] ?? "reply") as Tab;
   return (
     <div className="pb-10">
-      <h1 className="mb-3 text-2xl font-bold">Settings</h1>
-      <div className="-mx-3 mb-4 overflow-x-auto px-3">
-        <div className="inline-flex min-w-full gap-1 rounded-2xl bg-stone-200 p-1" role="tablist">
+      <PageTitle>Settings</PageTitle>
+      <div className="-mx-3 mb-5 overflow-x-auto px-3 pt-0.5 pb-2">
+        <div className="inline-flex min-w-full gap-1 rounded-2xl bg-white p-1.5 shadow-card ring-1 ring-stone-900/5" role="tablist">
           {TABS.map(([k, label]) => (
             <button
               key={k}
@@ -34,7 +34,7 @@ export function Settings({ tab }: { tab: string }) {
               role="tab"
               aria-selected={current === k}
               onClick={() => navigate(`/settings/${k}`, { replace: true })}
-              className={cx("min-h-11 flex-1 rounded-xl px-3 text-sm font-medium whitespace-nowrap", current === k ? "bg-white text-brand shadow-sm" : "text-stone-600 hover:text-stone-900")}
+              className={cx("min-h-11 flex-1 rounded-xl px-4 text-sm font-bold whitespace-nowrap transition", current === k ? "bg-brand text-white shadow-sm" : "text-stone-600 hover:bg-stone-100 hover:text-stone-900")}
             >
               {label}
             </button>
@@ -241,7 +241,7 @@ function ExamplesTab() {
           className={cx(!ex.active && "opacity-60")}
           title={
             <span>
-              {ex.customer_name ?? "Example"} <span className="text-sm font-normal text-stone-500">· {ex.word_count} words · {bucketLabel(ex.word_count)}</span>
+              {ex.customer_name ?? "Example"} <span className="text-sm font-medium text-white/75">· {ex.word_count} words · {bucketLabel(ex.word_count)}</span>
             </span>
           }
           actions={
@@ -372,7 +372,7 @@ function SpiffsTab() {
             <Card key={t} title={`${t === "install" ? "Install" : "Service"} rate today`}>
               {c ? (
                 <>
-                  <p className="text-2xl font-bold text-brand">
+                  <p className="text-2xl font-extrabold text-brand">
                     {formatCents(c.solo_amount_cents)} <span className="text-base font-normal text-stone-500">solo</span> · {formatCents(c.shared_amount_cents)}{" "}
                     <span className="text-base font-normal text-stone-500">each when shared</span>
                   </p>
@@ -421,26 +421,26 @@ function SpiffsTab() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="text-left text-stone-500">
+              <thead className="text-left text-white">
                 <tr>
-                  <th className="py-2 pr-3">Type</th>
-                  <th className="py-2 pr-3">From</th>
-                  <th className="py-2 pr-3">Solo</th>
-                  <th className="py-2 pr-3">Shared</th>
-                  <th className="py-2">Added by</th>
+                  <th className="rounded-l-xl bg-stone-800 px-3 py-2 font-bold">Type</th>
+                  <th className="bg-stone-800 px-3 py-2 font-bold">From</th>
+                  <th className="bg-stone-800 px-3 py-2 font-bold">Solo</th>
+                  <th className="bg-stone-800 px-3 py-2 font-bold">Shared</th>
+                  <th className="rounded-r-xl bg-stone-800 px-3 py-2 font-bold">Added by</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-stone-100">
+              <tbody>
                 {data.rules.map((r) => (
-                  <tr key={r.id} className={cx(r.effective_from > data.today && "text-sky-800")}>
-                    <td className="py-2 pr-3 capitalize">{r.spiff_type}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">
+                  <tr key={r.id} className={cx("even:bg-stone-50", r.effective_from > data.today && "text-sky-800")}>
+                    <td className="rounded-l-xl px-3 py-2.5 font-semibold capitalize">{r.spiff_type}</td>
+                    <td className="px-3 py-2.5 whitespace-nowrap">
                       {formatDate(r.effective_from)}
                       {r.effective_from > data.today && " (future)"}
                     </td>
-                    <td className="py-2 pr-3 tabular-nums">{formatCents(r.solo_amount_cents)}</td>
-                    <td className="py-2 pr-3 tabular-nums">{formatCents(r.shared_amount_cents)}</td>
-                    <td className="py-2 break-all text-stone-500">{r.created_by}</td>
+                    <td className="px-3 py-2.5 tabular-nums">{formatCents(r.solo_amount_cents)}</td>
+                    <td className="px-3 py-2.5 tabular-nums">{formatCents(r.shared_amount_cents)}</td>
+                    <td className="rounded-r-xl px-3 py-2.5 break-all text-stone-500">{r.created_by}</td>
                   </tr>
                 ))}
               </tbody>
@@ -453,8 +453,8 @@ function SpiffsTab() {
         <ul className="divide-y divide-stone-100">
           {departments.map((d) => (
             <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-              <span className="font-medium">{d.name}</span>
-              <select className={cx(inputCls, "w-auto")} value={d.spiff_type} onChange={(e) => setDeptType(d.id, e.target.value as SpiffType)}>
+              <span className="font-bold">{d.name}</span>
+              <select className={cx(inputCls, "w-auto!")} value={d.spiff_type} onChange={(e) => setDeptType(d.id, e.target.value as SpiffType)}>
                 <option value="install">Install</option>
                 <option value="service">Service</option>
                 <option value="none">None (recognition only)</option>
@@ -655,9 +655,9 @@ function LogTab() {
       <ul className="space-y-2">
         {data?.entries.map((e) => (
           <li key={e.id}>
-            <button type="button" onClick={() => setOpen(e)} className="w-full rounded-xl bg-white p-3 text-left ring-1 ring-stone-200 hover:ring-brand/40">
-              <p className="font-medium">{e.summary}</p>
-              <p className="text-xs text-stone-500">
+            <button type="button" onClick={() => setOpen(e)} className="w-full rounded-xl bg-white p-3.5 text-left shadow-card ring-1 ring-stone-900/5 transition hover:ring-brand/40">
+              <p className="font-bold">{e.summary}</p>
+              <p className="text-sm text-stone-500">
                 {new Date(e.at).toLocaleString()} · {e.user_email} · {e.action} {e.entity_type.replace("_", " ")}
                 {e.entity_id ? ` #${e.entity_id}` : ""}
               </p>

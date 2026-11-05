@@ -9,12 +9,12 @@ export function EmployeeChip({ name, department, amount, onClick, selected, disa
   const body = (
     <>
       <span className="font-semibold">{name}</span>
-      <span className="text-xs opacity-80">{department}</span>
+      <span className="text-[13px] opacity-80">{department}</span>
       {amount && <span className="ml-1 rounded-md bg-white/70 px-1.5 text-xs font-bold">{amount}</span>}
     </>
   );
   const cls = cx(
-    "inline-flex min-h-11 flex-wrap items-center gap-x-2 gap-y-0.5 rounded-xl px-3 py-1.5 text-left ring-1",
+    "inline-flex min-h-11 flex-wrap items-center gap-x-2 gap-y-0.5 rounded-xl px-3 py-1.5 text-left shadow-sm ring-1",
     deptClasses(department),
     selected && "ring-2 ring-brand outline-2 outline-offset-1 outline-brand",
     disabled && "opacity-40",
@@ -130,7 +130,7 @@ export function EmployeePicker({ open, title, initialQuery, excludeIds, onClose,
   return (
     <>
       <Modal open={open && !adding} onClose={onClose} title={title} wide>
-        <div className="sticky top-0 z-10 -mx-4 -mt-3 flex gap-2 bg-white px-4 pt-3 pb-2">
+        <div className="sticky -top-3 z-10 -mx-4 -mt-3 flex gap-2 bg-white px-4 pt-3 pb-2">
           <input ref={inputRef} className={inputCls} placeholder="Search name or alias…" value={q} onChange={(e) => setQ(e.target.value)} type="search" autoComplete="off" />
           <Button variant="gold" onClick={() => setAdding(true)} className="shrink-0">
             + Add new
@@ -147,7 +147,7 @@ export function EmployeePicker({ open, title, initialQuery, excludeIds, onClose,
         <div className="space-y-4 pb-2">
           {groups.map((g) => (
             <div key={g.dept.id}>
-              <h3 className="mb-1.5 text-xs font-bold tracking-wide text-stone-500 uppercase">
+              <h3 className="mb-2 text-[13px] font-extrabold tracking-wide text-brand uppercase">
                 {g.dept.name} · {g.dept.spiff_type === "none" ? "recognition" : g.dept.spiff_type}
               </h3>
               <div className="flex flex-wrap gap-2">

@@ -30,17 +30,17 @@ export function App() {
   else page = <Home />;
 
   const nav = (to: string, label: string, active: boolean) => (
-    <Link to={to} className={cx("inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium", active ? "bg-white/15 text-white" : "text-white/80 hover:text-white")}>
+    <Link to={to} className={cx("inline-flex min-h-11 items-center rounded-xl px-3.5 text-sm font-bold transition", active ? "bg-white text-brand shadow-sm" : "text-white/85 hover:bg-white/10 hover:text-white")}>
       {label}
     </Link>
   );
 
   return (
     <div className="min-h-dvh">
-      <header className="pt-safe sticky top-0 z-30 bg-brand text-white shadow">
+      <header className="pt-safe sticky top-0 z-30 bg-gradient-to-r from-brand to-brand-dark text-white shadow-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-1.5">
-          <Link to="/" className="flex min-h-11 items-center gap-2 font-bold">
-            <span className="inline-block size-6 rounded-full bg-gold" aria-hidden />
+          <Link to="/" className="flex min-h-11 items-center gap-2.5 text-lg font-extrabold tracking-tight">
+            <span className="inline-block size-6 rounded-full bg-gold ring-2 ring-white/30" aria-hidden />
             <span className="leading-tight">
               Review Spiffs <span className="hidden font-normal text-white/70 sm:inline">· Sun City</span>
             </span>

@@ -29,6 +29,28 @@ export function countByDepartment(reviews: { mentions: { department_name_snapsho
   return [...known, ...extras];
 }
 
+export interface DepartmentBar {
+  name: string;
+  count: number;
+  /** 0-100, one decimal place: this department's count relative to the busiest department (not a goal). */
+  pct: number;
+}
+
+/**
+ * Data for the dashboard's department progress gallery. Departments with no reviews this month are
+ * left out entirely (they reappear on their own once they get one), the rest are sorted busiest
+ * first, and each bar is scaled against the busiest department so that one is 100%. Ties keep the
+ * order of `items` (the directory order), so the layout never shuffles between renders.
+ * This is display-only: it never changes the counts themselves.
+ */
+export function departmentBars(items: { name: string; count: number }[]): DepartmentBar[] {
+  const visible = items.map((d, i) => ({ ...d, i })).filter((d) => d.count > 0);
+  const max = visible.reduce((m, d) => Math.max(m, d.count), 0);
+  return visible
+    .sort((a, b) => b.count - a.count || a.i - b.i)
+    .map(({ name, count }) => ({ name, count, pct: Math.round((count / max) * 1000) / 10 }));
+}
+
 export interface EmployeeTotal {
   employee_id: number;
   name: string;

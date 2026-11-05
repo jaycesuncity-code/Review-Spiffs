@@ -4,7 +4,7 @@ import { todayDenver, isValidDate } from "../../shared/dates";
 import type { AnalyzeResult, Review } from "../../shared/schemas";
 import { analyzeWithRetry } from "../api";
 import { blankDraft, draftFromAnalysis, ReviewEditor, type Draft } from "../components/ReviewEditor";
-import { Banner, Button, inputCls, Spinner, useToast } from "../components/ui";
+import { Banner, Button, Card, inputCls, PageTitle, Spinner, useToast } from "../components/ui";
 import { cx, uuid } from "../lib";
 import { useRouter } from "../router";
 
@@ -98,12 +98,15 @@ export function AddNew() {
   if (stored) {
     return (
       <div>
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h1 className="text-2xl font-bold">Review the entry</h1>
-          <Button size="sm" variant="ghost" onClick={startOver}>
-            Start over
-          </Button>
-        </div>
+        <PageTitle
+          right={
+            <Button size="sm" variant="ghost" onClick={startOver} className="text-brand">
+              Start over
+            </Button>
+          }
+        >
+          Review the entry
+        </PageTitle>
         <ReviewEditor
           key={stored.saveKey}
           mode="new"
@@ -128,17 +131,19 @@ export function AddNew() {
 
   return (
     <div className="mx-auto max-w-3xl pb-40">
-      <h1 className="mb-3 text-2xl font-bold">Add a review</h1>
+      <PageTitle sub="Paste the review, pick the date, and we'll draft the reply and find the employees named.">Add a review</PageTitle>
       <div className="space-y-4">
-        <div>
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <label htmlFor="raw" className="text-sm font-medium text-stone-700">
-              Paste the Google review (everything you copied is fine)
-            </label>
+        <Card
+          title="Google review"
+          actions={
             <Button size="sm" onClick={pasteFromClipboard} disabled={busy}>
               Paste from clipboard
             </Button>
-          </div>
+          }
+        >
+          <label htmlFor="raw" className="mb-2 block text-sm font-semibold text-stone-700">
+            Paste the Google review (everything you copied is fine)
+          </label>
           <textarea
             id="raw"
             ref={taRef}
@@ -148,14 +153,14 @@ export function AddNew() {
             disabled={busy}
             placeholder={"Steve Rogers\n9 reviews · 1 photo\n\n2 months ago\nRubin and Brian did a terrific job…"}
           />
-        </div>
-        <div>
-          <label htmlFor="posted" className="mb-1 block text-sm font-medium text-stone-700">
+        </Card>
+        <Card title="Posted date">
+          <label htmlFor="posted" className="mb-2 block text-sm font-semibold text-stone-700">
             When was this review posted?
           </label>
           <input id="posted" type="date" required className={cx(inputCls, "max-w-xs")} value={posted} onChange={(e) => setPosted(e.target.value)} disabled={busy} />
-          <p className="mt-1 text-xs text-stone-500">Google only shows “2 months ago”, so this date is the real one. Months group by it.</p>
-        </div>
+          <p className="mt-2 text-sm text-stone-500">Google only shows “2 months ago”, so this date is the real one. Months group by it.</p>
+        </Card>
         {error && (
           <Banner tone="error">
             <p className="font-medium">{error}</p>
@@ -171,7 +176,7 @@ export function AddNew() {
         )}
       </div>
 
-      <div className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white/95 px-3 pt-3 backdrop-blur">
+      <div className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white/95 px-3 pt-3 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] backdrop-blur">
         <div className="mx-auto flex max-w-3xl flex-col gap-2">
           <Button variant="primary" size="xl" className="w-full" onClick={generate} disabled={busy || !raw.trim() || !isValidDate(posted)}>
             {busy ? (
@@ -183,7 +188,7 @@ export function AddNew() {
             )}
           </Button>
           {!busy && (
-            <button type="button" className="min-h-11 text-sm font-medium text-brand underline-offset-2 hover:underline" onClick={manual}>
+            <button type="button" className="min-h-11 text-sm font-semibold text-brand underline-offset-2 hover:underline" onClick={manual}>
               Skip AI and enter manually
             </button>
           )}

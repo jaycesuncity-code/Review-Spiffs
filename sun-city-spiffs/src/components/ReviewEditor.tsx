@@ -419,7 +419,7 @@ export function ReviewEditor({ mode, initial, saveKey, reviewId, expectedUpdated
           <Card className="order-4" title="Rating & job type">
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-stone-500">Stars</span>
+                <span className="mb-1 block text-sm font-semibold text-stone-700">Stars</span>
                 <select className={inputCls} value={d.star_rating ?? ""} onChange={(e) => update({ star_rating: e.target.value ? Number(e.target.value) : null })}>
                   <option value="">Unknown</option>
                   {[5, 4, 3, 2, 1].map((s) => (
@@ -430,7 +430,7 @@ export function ReviewEditor({ mode, initial, saveKey, reviewId, expectedUpdated
                 </select>
               </label>
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-stone-500">Job type guess</span>
+                <span className="mb-1 block text-sm font-semibold text-stone-700">Job type guess</span>
                 <select className={inputCls} value={d.job_type_guess} onChange={(e) => update({ job_type_guess: e.target.value as JobType })}>
                   <option value="unknown">Unknown</option>
                   <option value="service">Service</option>
@@ -484,7 +484,7 @@ export function ReviewEditor({ mode, initial, saveKey, reviewId, expectedUpdated
                           selected
                           onClick={() => (m.candidates.length > 1 ? setRow(m.key, { selected: null }) : setPicker({ rowKey: m.key, query: m.mention_text ?? "" }))}
                         />
-                        <span className="text-xs text-stone-500">Tap to change</span>
+                        <span className="text-sm text-stone-500">Tap to change</span>
                       </div>
                     ) : m.candidates.length > 0 ? (
                       <>
@@ -521,8 +521,8 @@ export function ReviewEditor({ mode, initial, saveKey, reviewId, expectedUpdated
                 {calc.lines.map((l) => (
                   <li key={l.employee_id} className="flex items-start justify-between gap-3 py-2">
                     <div>
-                      <p className="font-medium">{l.employee_name}</p>
-                      <p className="text-xs text-stone-500">{l.rule_note}</p>
+                      <p className="font-bold">{l.employee_name}</p>
+                      <p className="text-sm text-stone-500">{l.rule_note}</p>
                     </div>
                     <p className="font-semibold tabular-nums">{formatCents(l.amount_cents)}</p>
                   </li>
@@ -531,7 +531,7 @@ export function ReviewEditor({ mode, initial, saveKey, reviewId, expectedUpdated
             )}
             <div className="mt-2 flex items-center justify-between border-t border-stone-200 pt-2 text-lg font-bold">
               <span>Review total</span>
-              <span className="tabular-nums">{formatCents(calc?.total_cents ?? 0)}</span>
+              <span className="text-brand tabular-nums">{formatCents(calc?.total_cents ?? 0)}</span>
             </div>
           </Card>
 

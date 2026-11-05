@@ -4,11 +4,19 @@ import { copyText, cx } from "../lib";
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "gold";
 
 const VARIANTS: Record<Variant, string> = {
-  primary: "bg-brand text-white hover:bg-brand-dark active:bg-brand-dark shadow-sm disabled:bg-stone-300 disabled:text-stone-500",
+  primary: "bg-brand text-white hover:bg-brand-dark active:bg-brand-dark shadow-sm shadow-brand/30 disabled:bg-stone-300 disabled:text-stone-500 disabled:shadow-none",
   gold: "bg-gold text-stone-900 hover:brightness-95 shadow-sm disabled:bg-stone-300 disabled:text-stone-500",
-  secondary: "bg-white text-stone-800 ring-1 ring-stone-300 hover:bg-stone-50 disabled:text-stone-400",
+  secondary: "bg-white text-stone-800 shadow-sm ring-1 ring-stone-300/80 hover:bg-stone-50 disabled:text-stone-400 disabled:shadow-none",
   ghost: "bg-transparent text-brand hover:bg-brand-light disabled:text-stone-400",
   danger: "bg-white text-red-700 ring-1 ring-red-300 hover:bg-red-50 disabled:text-stone-400",
+};
+
+/** True inside a maroon header bar (Card titles, Modal titles): buttons switch to light-on-dark so they stay visible. */
+const OnDark = createContext(false);
+
+const ON_DARK: Partial<Record<Variant, string>> = {
+  primary: "bg-white text-brand hover:bg-brand-light active:bg-brand-light shadow-sm disabled:bg-white/20 disabled:text-white/60",
+  ghost: "bg-transparent text-white hover:bg-white/15 disabled:text-white/40",
 };
 
 export function Button({
@@ -17,6 +25,7 @@ export function Button({
   className,
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: "sm" | "md" | "lg" | "xl" }) {
+  const onDark = useContext(OnDark);
   const sizes = {
     sm: "min-h-11 px-3 text-sm",
     md: "min-h-11 px-4 text-base",
@@ -28,26 +37,44 @@ export function Button({
       type="button"
       {...rest}
       className={cx(
-        "inline-flex items-center justify-center gap-2 rounded-xl font-medium transition select-none disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold",
+        "inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition select-none disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold",
         sizes[size],
-        VARIANTS[variant],
+        (onDark && ON_DARK[variant]) || VARIANTS[variant],
         className,
       )}
     />
   );
 }
 
+/** White card. With a title or actions it gets the same maroon header bar as the dashboard sections. */
 export function Card({ title, actions, children, className }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string }) {
+  const header = !!(title || actions);
   return (
-    <section className={cx("rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200", className)}>
-      {(title || actions) && (
-        <header className="mb-3 flex min-h-11 flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-semibold text-stone-800">{title}</h2>
-          {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
-        </header>
+    <section className={cx("overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-stone-900/5", !header && "p-4", className)}>
+      {header && (
+        <OnDark.Provider value>
+          <header className="flex min-h-14 flex-wrap items-center justify-between gap-x-3 gap-y-2 bg-gradient-to-r from-brand to-brand-dark px-4 py-1.5 text-white sm:px-5">
+            <h2 className="text-lg font-extrabold tracking-tight">{title}</h2>
+            {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+          </header>
+        </OnDark.Provider>
       )}
-      {children}
+      {header ? <div className="p-4 sm:p-5">{children}</div> : children}
     </section>
+  );
+}
+
+/** Page heading with a short maroon accent bar, used at the top of every page. */
+export function PageTitle({ children, sub, right }: { children: ReactNode; sub?: ReactNode; right?: ReactNode }) {
+  return (
+    <div className="mb-5 flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
+      <div className="min-w-0">
+        <h1 className="text-3xl font-extrabold tracking-tight text-stone-900">{children}</h1>
+        {sub && <p className="mt-1 text-sm text-stone-500">{sub}</p>}
+        <span className="mt-2 block h-1 w-10 rounded-full bg-brand" aria-hidden />
+      </div>
+      {right}
+    </div>
   );
 }
 
@@ -98,16 +125,18 @@ export function Modal({ open, onClose, title, children, footer, wide }: { open: 
         aria-modal="true"
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
-        className={cx("flex max-h-[92dvh] w-full flex-col rounded-t-2xl bg-white shadow-xl sm:rounded-2xl", wide ? "sm:max-w-2xl" : "sm:max-w-lg")}
+        className={cx("flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:rounded-2xl", wide ? "sm:max-w-2xl" : "sm:max-w-lg")}
       >
-        <div className="flex items-center justify-between gap-2 border-b border-stone-200 px-4 py-2">
-          <h2 className="text-lg font-semibold">{title}</h2>
-          <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
-            ✕
-          </Button>
-        </div>
+        <OnDark.Provider value>
+          <div className="flex items-center justify-between gap-2 bg-gradient-to-r from-brand to-brand-dark px-4 py-2 text-white">
+            <h2 className="text-lg font-extrabold tracking-tight">{title}</h2>
+            <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
+              ✕
+            </Button>
+          </div>
+        </OnDark.Provider>
         <div className="flex-1 overflow-y-auto px-4 py-3">{children}</div>
-        {footer && <div className="pb-safe flex flex-wrap justify-end gap-2 border-t border-stone-200 px-4 pt-3">{footer}</div>}
+        {footer && <div className="pb-safe flex flex-wrap justify-end gap-2 border-t border-stone-200 bg-stone-50 px-4 pt-3">{footer}</div>}
       </div>
     </div>
   );
@@ -140,27 +169,27 @@ export function Banner({ tone = "info", children }: { tone?: "info" | "warn" | "
     error: "bg-red-50 text-red-900 ring-red-200",
     ok: "bg-emerald-50 text-emerald-900 ring-emerald-200",
   };
-  return <div className={cx("rounded-xl px-3 py-2 text-sm ring-1", tones[tone])}>{children}</div>;
+  return <div className={cx("rounded-xl px-3.5 py-2.5 text-sm ring-1", tones[tone])}>{children}</div>;
 }
 
 export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <div className="rounded-2xl border-2 border-dashed border-stone-300 bg-white/50 px-4 py-10 text-center">
-      <p className="text-lg font-semibold text-stone-700">{title}</p>
+    <div className="rounded-2xl border-2 border-dashed border-stone-300 bg-white/60 px-4 py-10 text-center">
+      <p className="text-lg font-bold text-stone-700">{title}</p>
       {children && <div className="mt-1 text-stone-500">{children}</div>}
     </div>
   );
 }
 
 export const inputCls =
-  "w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none disabled:bg-stone-100";
+  "w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-base text-stone-900 shadow-sm placeholder:text-stone-400 focus:border-brand focus:ring-2 focus:ring-brand/25 focus:outline-none disabled:bg-stone-100";
 
 export function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-medium text-stone-700">{label}</span>
+      <span className="mb-1 block text-sm font-semibold text-stone-700">{label}</span>
       {children}
-      {hint && <span className="mt-1 block text-xs text-stone-500">{hint}</span>}
+      {hint && <span className="mt-1 block text-sm text-stone-500">{hint}</span>}
     </label>
   );
 }

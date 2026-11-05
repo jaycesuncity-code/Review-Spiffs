@@ -46,4 +46,15 @@ export function deptClasses(department: string): string {
   return "bg-stone-100 text-stone-800 ring-stone-300";
 }
 
-export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
+/** Progress-bar fill and icon-tile colors for a department, following the same color coding as the chips above. */
+export function deptAccent(department: string): { bar: string; tile: string } {
+  const d = department.toLowerCase();
+  if (d.includes("hvac service")) return { bar: "bg-red-700", tile: "bg-red-50 text-red-700" };
+  if (d.includes("hvac install")) return { bar: "bg-red-900", tile: "bg-red-100 text-red-900" };
+  if (d.includes("new construction")) return { bar: "bg-orange-600", tile: "bg-orange-50 text-orange-700" };
+  if (d.includes("plumbing service")) return { bar: "bg-sky-700", tile: "bg-sky-50 text-sky-700" };
+  if (d.includes("plumbing install")) return { bar: "bg-indigo-700", tile: "bg-indigo-50 text-indigo-800" };
+  return { bar: "bg-stone-500", tile: "bg-stone-100 text-stone-600" };
+}
+
+export const cx =(...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
