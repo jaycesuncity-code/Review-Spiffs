@@ -2,13 +2,21 @@ import { useEffect, useRef, useState } from "react";
 import { cleanReviewPaste } from "../../shared/cleaner";
 import { todayDenver, isValidDate } from "../../shared/dates";
 import type { AnalyzeResult, Review } from "../../shared/schemas";
-import { analyzeWithRetry } from "../api";
-import { blankDraft, draftFromAnalysis, ReviewEditor, type Draft } from "../components/ReviewEditor";
-import { Banner, Button, Card, inputCls, PageTitle, Spinner, useToast } from "../components/ui";
+import { analyzeWithRetry, ApiError } from "../api";
+import { prefersReducedMotion } from "../components/reveal";
+import { blankDraft, draftFromAnalysis, ReviewEditor, ReviewEditorSkeleton, type Draft } from "../components/ReviewEditor";
+import { Banner, Button, Card, inputCls, PageTitle, useToast } from "../components/ui";
 import { cx, uuid } from "../lib";
 import { useRouter } from "../router";
 
 const STORE = "review-spiffs:draft";
+/** Skeleton intro (silhouettes → chrome → labels). Must match the CSS phase timings in index.css. */
+const INTRO_MS = 900;
+/** Give up waiting on the AI after this long (the server already retries OpenAI and polls in-progress requests). */
+const GENERATE_TIMEOUT_MS = 105_000;
+
+/** The response screen while the AI request is in flight, or after it failed. */
+type Gen = { phase: "loading" } | { phase: "error"; message: string };
 
 interface Stored {
   saveKey: string;
@@ -29,42 +37,93 @@ export function AddNew() {
   const toast = useToast();
   const [raw, setRaw] = useState("");
   const [posted, setPosted] = useState(todayDenver());
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [stored, setStored] = useState<Stored | null>(() => loadStored());
-  const submitting = useRef(false);
+  const [gen, setGen] = useState<Gen | null>(null);
+  // A result that arrived before the intro finished waits here, so the typing never starts mid-intro.
+  const [buffered, setBuffered] = useState<Stored | null>(null);
+  const [introDone, setIntroDone] = useState(false);
+  // Only a fresh Generate animates; a restored or re-rendered draft never replays it.
+  const [revealKey, setRevealKey] = useState<string | null>(null);
+  const [fadeIn, setFadeIn] = useState(false);
+  const inflight = useRef<AbortController | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!stored) taRef.current?.focus();
   }, [stored]);
 
-  const begin = (s: Stored) => {
+  // Leaving the page mid-load (back button, nav link) aborts the request.
+  useEffect(
+    () => () => {
+      const c = inflight.current;
+      inflight.current = null;
+      c?.abort();
+    },
+    [],
+  );
+
+  const begin = (s: Stored, scroll = true) => {
     try {
       sessionStorage.setItem(STORE, JSON.stringify(s));
     } catch {
       /* private mode */
     }
     setStored(s);
-    window.scrollTo(0, 0);
+    if (scroll) window.scrollTo(0, 0);
   };
 
-  const generate = async () => {
-    if (submitting.current) return;
-    submitting.current = true;
-    setBusy(true);
-    setError(null);
+  const generate = () => {
+    if (inflight.current) return; // one request per click, never duplicated
+    const c = new AbortController();
+    inflight.current = c;
     const requestId = uuid(); // reused for automatic retries of THIS submission only
-    try {
-      const r = await analyzeWithRetry<AnalyzeResult>({ request_id: requestId, review_raw: raw, posted_date: posted });
-      begin({ saveKey: requestId, draft: draftFromAnalysis(r, raw, posted) });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
-    } finally {
-      submitting.current = false;
-      setBusy(false);
-    }
+    const reviewRaw = raw;
+    const postedDate = posted;
+    // Show the response screen right away; the request runs independently of it.
+    setGen({ phase: "loading" });
+    setBuffered(null);
+    setIntroDone(prefersReducedMotion());
+    window.scrollTo(0, 0);
+    const timer = setTimeout(() => c.abort(new ApiError(0, "The AI is taking too long to answer. Try again in a moment.")), GENERATE_TIMEOUT_MS);
+    analyzeWithRetry<AnalyzeResult>({ request_id: requestId, review_raw: reviewRaw, posted_date: postedDate }, c.signal)
+      .then((r) => {
+        if (inflight.current === c) setBuffered({ saveKey: requestId, draft: draftFromAnalysis(r, reviewRaw, postedDate) });
+      })
+      .catch((e) => {
+        if (inflight.current === c) setGen({ phase: "error", message: e instanceof Error ? e.message : "Something went wrong" });
+      })
+      .finally(() => {
+        clearTimeout(timer);
+        if (inflight.current === c) inflight.current = null;
+      });
   };
+
+  const cancel = () => {
+    const c = inflight.current;
+    inflight.current = null;
+    c?.abort();
+    setGen(null);
+    setBuffered(null);
+  };
+
+  // Intro timer: independent of the API.
+  useEffect(() => {
+    if (gen?.phase !== "loading" || introDone) return;
+    const t = setTimeout(() => setIntroDone(true), INTRO_MS);
+    return () => clearTimeout(t);
+  }, [gen, introDone]);
+
+  // Result + finished intro → hand over to the editor, which plays the typing reveal.
+  useEffect(() => {
+    if (gen?.phase !== "loading" || !buffered || !introDone) return;
+    const reduced = prefersReducedMotion();
+    setGen(null);
+    setBuffered(null);
+    setFadeIn(reduced);
+    setRevealKey(reduced ? null : buffered.saveKey);
+    begin(buffered, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gen, buffered, introDone]);
 
   const manual = () => {
     // Keep the pasted text so nothing is lost; the reply is typed by hand.
@@ -74,6 +133,7 @@ export function AddNew() {
     // The reviewer's name is normally the first line of a Google paste.
     const first = raw.trim().split("\n")[0]?.trim() ?? "";
     if (cleaned.text !== raw.trim() && first && first.length <= 60) draft.customer_name = first;
+    setGen(null);
     begin({ saveKey: uuid(), draft });
   };
 
@@ -91,9 +151,60 @@ export function AddNew() {
   const startOver = () => {
     sessionStorage.removeItem(STORE);
     setStored(null);
+    setRevealKey(null);
+    setFadeIn(false);
     setRaw("");
     setPosted(todayDenver());
   };
+
+  if (gen) {
+    return (
+      <div>
+        <PageTitle
+          right={
+            <Button size="sm" variant="ghost" onClick={cancel} className="text-brand">
+              {gen.phase === "loading" ? "Cancel" : "Back"}
+            </Button>
+          }
+        >
+          Review the entry
+        </PageTitle>
+        {gen.phase === "loading" ? (
+          <>
+            <p className="sr-only" role="status">
+              Drafting the reply…
+            </p>
+            <ReviewEditorSkeleton />
+          </>
+        ) : (
+          <div className="reveal-fade mx-auto max-w-2xl pb-16">
+            <Card title="Couldn’t draft the reply">
+              <div className="space-y-4" role="alert">
+                <Banner tone="error">
+                  <p className="font-medium">{gen.message}</p>
+                </Banner>
+                <div>
+                  <p className="mb-1 text-sm font-semibold text-stone-700">Your pasted review is safe</p>
+                  <div className="max-h-40 overflow-y-auto rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm break-words whitespace-pre-wrap text-stone-700">{raw}</div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="primary" size="lg" onClick={generate}>
+                    ↻ Retry
+                  </Button>
+                  <Button size="lg" onClick={cancel}>
+                    Edit the review
+                  </Button>
+                  <Button size="lg" variant="ghost" onClick={manual}>
+                    Enter manually
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (stored) {
     return (
@@ -107,11 +218,14 @@ export function AddNew() {
         >
           Review the entry
         </PageTitle>
+        <div className={fadeIn ? "reveal-fade" : undefined}>
         <ReviewEditor
           key={stored.saveKey}
           mode="new"
           initial={stored.draft}
           saveKey={stored.saveKey}
+          reveal={stored.saveKey === revealKey}
+          onRevealDone={() => setRevealKey(null)}
           onDraftChange={(d) => {
             try {
               sessionStorage.setItem(STORE, JSON.stringify({ saveKey: stored.saveKey, draft: d }));
@@ -125,6 +239,7 @@ export function AddNew() {
             navigate(`/?month=${review.posted_date.slice(0, 7)}&highlight=${review.id}&saved=1`);
           }}
         />
+        </div>
       </div>
     );
   }
@@ -136,7 +251,7 @@ export function AddNew() {
         <Card
           title="Google review"
           actions={
-            <Button size="sm" onClick={pasteFromClipboard} disabled={busy}>
+            <Button size="sm" onClick={pasteFromClipboard}>
               Paste from clipboard
             </Button>
           }
@@ -150,7 +265,6 @@ export function AddNew() {
             className={cx(inputCls, "h-[42dvh] min-h-60 leading-relaxed")}
             value={raw}
             onChange={(e) => setRaw(e.target.value)}
-            disabled={busy}
             placeholder={"Steve Rogers\n9 reviews · 1 photo\n\n2 months ago\nRubin and Brian did a terrific job…"}
           />
         </Card>
@@ -158,40 +272,19 @@ export function AddNew() {
           <label htmlFor="posted" className="mb-2 block text-sm font-semibold text-stone-700">
             When was this review posted?
           </label>
-          <input id="posted" type="date" required className={cx(inputCls, "max-w-xs")} value={posted} onChange={(e) => setPosted(e.target.value)} disabled={busy} />
+          <input id="posted" type="date" required className={cx(inputCls, "max-w-xs")} value={posted} onChange={(e) => setPosted(e.target.value)} />
           <p className="mt-2 text-sm text-stone-500">Google only shows “2 months ago”, so this date is the real one. Months group by it.</p>
         </Card>
-        {error && (
-          <Banner tone="error">
-            <p className="font-medium">{error}</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <Button size="sm" variant="primary" onClick={generate}>
-                Try again
-              </Button>
-              <Button size="sm" onClick={manual}>
-                Enter manually
-              </Button>
-            </div>
-          </Banner>
-        )}
       </div>
 
       <div className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white/95 px-3 pt-3 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] backdrop-blur">
         <div className="mx-auto flex max-w-3xl flex-col gap-2">
-          <Button variant="primary" size="xl" className="w-full" onClick={generate} disabled={busy || !raw.trim() || !isValidDate(posted)}>
-            {busy ? (
-              <>
-                <Spinner /> Writing the reply…
-              </>
-            ) : (
-              "Generate reply"
-            )}
+          <Button variant="primary" size="xl" className="w-full" onClick={generate} disabled={!raw.trim() || !isValidDate(posted)}>
+            Generate reply
           </Button>
-          {!busy && (
-            <button type="button" className="min-h-11 text-sm font-semibold text-brand underline-offset-2 hover:underline" onClick={manual}>
-              Skip AI and enter manually
-            </button>
-          )}
+          <button type="button" className="min-h-11 text-sm font-semibold text-brand underline-offset-2 hover:underline" onClick={manual}>
+            Skip AI and enter manually
+          </button>
         </div>
       </div>
     </div>

@@ -46,3 +46,134 @@ select {
 .flash {
   animation: flash 1.2s ease-out 3;
 }
+
+/* ---------- Generate → response screen: skeleton intro + typing reveal ----------
+   Only opacity and transform are animated, so it stays smooth on phones. */
+
+/* Phase 1: a gray silhouette in the exact box of every card. */
+.skel-silhouette {
+  overflow: hidden; /* positioned by the absolute utility on the element */
+  display: flex;
+  flex-direction: column;
+  background: rgb(231 226 223);
+}
+.skel-silhouette::before {
+  content: "";
+  height: 3.5rem; /* the Card header's min-h-14 */
+  background: rgb(219 212 208);
+}
+
+/* Field placeholders inside the cards. */
+.skel-bar {
+  position: relative;
+  overflow: hidden;
+  background: rgb(240 236 233);
+}
+
+/* A soft sweep tinted with the maroon accent family. */
+.skel-silhouette::after,
+.skel-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(100deg, transparent 15%, rgb(154 13 40 / 0.06) 38%, rgb(255 255 255 / 0.6) 50%, rgb(154 13 40 / 0.06) 62%, transparent 85%);
+  animation: skel-shimmer 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes skel-shimmer {
+  to { transform: translateX(100%); }
+}
+
+@keyframes skel-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Phase 2: card chrome (white body, maroon header) fades in over the silhouette. */
+.skel-chrome {
+  animation: skel-fade 300ms ease-out 250ms both;
+}
+
+/* Phase 3: titles and static labels. */
+.skel-label {
+  animation: skel-fade 280ms ease-out 580ms both;
+}
+
+/* Blinking caret: solid while typing, blinking while waiting. */
+.reveal-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.15em;
+  margin-left: 1px;
+  vertical-align: -0.2em;
+  border-radius: 1px;
+  background: var(--color-brand);
+}
+.reveal-caret-blink {
+  animation: caret-blink 1.05s steps(1, end) infinite;
+}
+@keyframes caret-blink {
+  50% { opacity: 0; }
+}
+
+/* One pulse of the whole page when typing starts. */
+.reveal-pulse {
+  position: relative;
+  animation: reveal-pulse 380ms cubic-bezier(0.3, 0.7, 0.4, 1);
+}
+.reveal-pulse::after {
+  content: "";
+  position: absolute;
+  inset: -0.5rem;
+  border-radius: 1.5rem;
+  pointer-events: none;
+  opacity: 0;
+  box-shadow: 0 0 0 2px rgb(154 13 40 / 0.22), 0 0 48px 8px rgb(154 13 40 / 0.2);
+  animation: reveal-glow 420ms ease-out;
+}
+@keyframes reveal-pulse {
+  40% { transform: scale(1.006); }
+}
+@keyframes reveal-glow {
+  35% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Employee chips pop in one by one (delay set inline). */
+.reveal-pop {
+  animation: reveal-pop 260ms cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+}
+@keyframes reveal-pop {
+  from { opacity: 0; transform: scale(0.92) translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Things that appear once at the end of the reveal. */
+.reveal-hold {
+  opacity: 0;
+}
+.reveal-show {
+  transition: opacity 220ms ease-out;
+}
+
+/* Reduced-motion path: a single fade of the finished screen. */
+.reveal-fade {
+  animation: skel-fade 240ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skel-silhouette::after,
+  .skel-bar::after,
+  .reveal-caret-blink,
+  .reveal-pulse,
+  .reveal-pulse::after,
+  .reveal-pop {
+    animation: none;
+  }
+  .skel-chrome,
+  .skel-label {
+    animation: none;
+    opacity: 1;
+  }
+}

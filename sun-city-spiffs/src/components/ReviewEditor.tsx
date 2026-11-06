@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { formatDate, isValidDate } from "../../shared/dates";
 import { firstName, nameTokens, normalizeName } from "../../shared/names";
 import type { AnalyzeResult, CalcResult, DuplicateMatch, EmployeeLite, Review, RewriteResult } from "../../shared/schemas";
@@ -8,6 +8,7 @@ import { useDirectory } from "../directory";
 import { cx, uuid } from "../lib";
 import { Link } from "../router";
 import { EmployeeChip, EmployeePicker } from "./EmployeePicker";
+import { Bar, Caret, CountUp, Typed, useReveal, type RevealField } from "./reveal";
 import { Banner, Button, Card, Confirm, CopyButton, inputCls, Modal, Spinner, useToast } from "./ui";
 
 type JobType = "install" | "service" | "unknown";
@@ -141,9 +142,27 @@ interface Props {
   onDraftChange?: (d: Draft) => void;
   onSaved: (review: Review) => void;
   onDeleted?: () => void;
+  /** Play the typing reveal (fresh Generate only). Presentation only: the data is already complete. */
+  reveal?: boolean;
+  onRevealDone?: () => void;
 }
 
-export function ReviewEditor({ mode, initial, saveKey, reviewId, expectedUpdatedAt, onDraftChange, onSaved, onDeleted }: Props) {
+/** The order fields fill in during the reveal: top to bottom as laid out on a phone. */
+function revealFields(d: Draft): RevealField[] {
+  const f: RevealField[] = [
+    { key: "reply", text: d.reply_final_text },
+    { key: "customer", text: d.customer_name },
+    { key: "date", text: dateDisplay(d.posted_date) },
+    { key: "rating" },
+    { key: "review", text: d.review_text },
+  ];
+  if (d.services_text !== null) f.push({ key: "services", text: d.services_text });
+  return f;
+}
+
+const dateDisplay = (date: string) => (isValidDate(date) ? formatDate(date) : date || "(not set)");
+
+export function ReviewEditor({ mode, initial, saveKey, reviewId, expectedUpdatedAt, onDraftChange, onSaved, onDeleted, reveal, onRevealDone }: Props) {
   const { employees, byId } = useDirectory();
   const toast = useToast();
   const [d, setD] = useState<Draft>(initial);
@@ -162,6 +181,21 @@ export function ReviewEditor({ mode, initial, saveKey, reviewId, expectedUpdated
   const [saveError, setSaveError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const rv = useReveal(!!reveal, revealFields(initial), initial.mentions.length, onRevealDone);
+  const replyTa = useRef<HTMLTextAreaElement>(null);
+  // Screen readers get the finished draft once, not every typed character.
+  const [announce] = useState(() => `Draft ready${initial.customer_name ? ` for ${initial.customer_name}` : ""}. Reply: ${initial.reply_final_text}`);
+
+  // Hand the reply box over from the typing overlay to the real textarea without a jump, then settle at the top.
+  useLayoutEffect(() => {
+    const ta = replyTa.current;
+    if (!rv.used || rv.stage !== "done" || !ta) return;
+    ta.scrollTop = rv.replyScrollTop();
+    if (!ta.scrollTop) return;
+    const t = setTimeout(() => ta.scrollTo({ top: 0, behavior: "smooth" }), 250);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rv.stage]);
 
   const update = (patch: Partial<Draft>) =>
     setD((cur) => {
@@ -357,13 +391,22 @@ export function ReviewEditor({ mode, initial, saveKey, reviewId, expectedUpdated
         </Button>
       }
     >
-      <textarea
-        className={cx(inputCls, "min-h-44 leading-relaxed")}
-        value={d.reply_final_text}
-        onChange={(e) => update({ reply_final_text: e.target.value })}
-        placeholder="Type or generate the public reply…"
-        aria-label="Company reply"
-      />
+      {rv.active ? (
+        // An empty twin of the textarea below holds the exact box; the text is typed over it, then the real textarea takes over.
+        <ReplyBox scrollRef={rv.scrollRef("reply")}>
+          <span ref={rv.textRef("reply")} />
+          <Caret ref={rv.caretRef("reply")} />
+        </ReplyBox>
+      ) : (
+        <textarea
+          ref={replyTa}
+          className={cx(inputCls, "min-h-44 leading-relaxed")}
+          value={d.reply_final_text}
+          onChange={(e) => update({ reply_final_text: e.target.value })}
+          placeholder="Type or generate the public reply…"
+          aria-label="Company reply"
+        />
+      )}
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-stone-500">
           {replyWords} words{d.length_target ? ` · target: ${d.length_target}` : ""}
@@ -371,7 +414,7 @@ export function ReviewEditor({ mode, initial, saveKey, reviewId, expectedUpdated
         <CopyButton text={d.reply_final_text} label="Copy reply" size="lg" variant="primary" className="w-full sm:w-auto" />
       </div>
       {nameWarnings.length > 0 && (
-        <div className="mt-3 space-y-1">
+        <div className={cx("mt-3 space-y-1", rv.active ? "reveal-hold" : rv.used && "reveal-show")}>
           {nameWarnings.map((w) => (
             <Banner key={w} tone="warn">
               {w}
@@ -383,20 +426,23 @@ export function ReviewEditor({ mode, initial, saveKey, reviewId, expectedUpdated
   );
 
   const reviewCard = (
-    <FieldCard label="Review text" value={d.review_text} copy editing={!!editing.review} setEditing={setEdit("review")}>
+    <FieldCard label="Review text" value={d.review_text} display={rv.active ? <Typed rv={rv} k="review" text={d.review_text} /> : undefined} copy editing={!!editing.review} setEditing={setEdit("review")}>
       <textarea className={cx(inputCls, "min-h-40")} value={d.review_text} onChange={(e) => update({ review_text: e.target.value })} />
     </FieldCard>
   );
 
   return (
-    <div className="pb-48">
-      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:items-start">
+    <div className="pb-48" inert={rv.active} aria-busy={rv.active || undefined}>
+      <p className="sr-only" role="status">
+        {rv.used && rv.stage === "done" ? announce : ""}
+      </p>
+      <div className={cx("flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:items-start", rv.active && "reveal-pulse")}>
         <div className="contents lg:flex lg:flex-col lg:gap-4">
           {replyCard}
           <div className="order-9">{reviewCard}</div>
           {d.services_text !== null && (
             <div className="order-9">
-              <FieldCard label="Services" value={d.services_text ?? ""} editing={!!editing.services} setEditing={setEdit("services")}>
+              <FieldCard label="Services" value={d.services_text ?? ""} display={rv.active ? <Typed rv={rv} k="services" text={d.services_text ?? ""} /> : undefined} editing={!!editing.services} setEditing={setEdit("services")}>
                 <input className={inputCls} value={d.services_text ?? ""} onChange={(e) => update({ services_text: e.target.value })} />
               </FieldCard>
             </div>
@@ -405,19 +451,19 @@ export function ReviewEditor({ mode, initial, saveKey, reviewId, expectedUpdated
 
         <div className="contents lg:flex lg:flex-col lg:gap-4">
           <div className="order-2">
-            <FieldCard label="Customer name" value={d.customer_name} editing={!!editing.customer} setEditing={setEdit("customer")}>
+            <FieldCard label="Customer name" value={d.customer_name} display={rv.active ? <Typed rv={rv} k="customer" text={d.customer_name} /> : undefined} editing={!!editing.customer} setEditing={setEdit("customer")}>
               <input className={inputCls} value={d.customer_name} onChange={(e) => update({ customer_name: e.target.value })} autoComplete="off" placeholder="Customer name" />
             </FieldCard>
           </div>
 
           <div className="order-3">
-            <FieldCard label="Posted date" value={d.posted_date} display={isValidDate(d.posted_date) ? formatDate(d.posted_date) : d.posted_date || "(not set)"} editing={!!editing.date} setEditing={setEdit("date")}>
+            <FieldCard label="Posted date" value={d.posted_date} display={<Typed rv={rv} k="date" text={dateDisplay(d.posted_date)} />} editing={!!editing.date} setEditing={setEdit("date")}>
               <input type="date" className={inputCls} value={d.posted_date} onChange={(e) => update({ posted_date: e.target.value })} />
             </FieldCard>
           </div>
 
           <Card className="order-4" title="Rating & job type">
-            <div className="grid grid-cols-2 gap-3">
+            <div ref={rv.fadeRef("rating")} className={cx("grid grid-cols-2 gap-3", rv.used && "reveal-show")} style={rv.active ? { opacity: 0 } : undefined}>
               <label className="block">
                 <span className="mb-1 block text-sm font-semibold text-stone-700">Stars</span>
                 <select className={inputCls} value={d.star_rating ?? ""} onChange={(e) => update({ star_rating: e.target.value ? Number(e.target.value) : null })}>
@@ -456,11 +502,15 @@ export function ReviewEditor({ mode, initial, saveKey, reviewId, expectedUpdated
           >
             {d.mentions.length === 0 && <p className="text-stone-600">No employees mentioned, no spiff. You can still save.</p>}
             <ul className="space-y-3">
-              {d.mentions.map((m) => {
+              {d.mentions.map((m, i) => {
                 const sel = m.selected !== null ? byId(m.selected) ?? m.candidates.find((c) => c.id === m.selected) : undefined;
                 const takenElsewhere = (id: number) => d.mentions.some((o) => o.key !== m.key && o.selected === id);
                 return (
-                  <li key={m.key} className={cx("rounded-xl p-3 ring-1", m.selected === null ? "bg-amber-50 ring-amber-300" : "bg-stone-50 ring-stone-200")}>
+                  <li
+                    key={m.key}
+                    className={cx("rounded-xl p-3 ring-1", m.selected === null ? "bg-amber-50 ring-amber-300" : "bg-stone-50 ring-stone-200", rv.active && (rv.stage === "typing" ? "opacity-0" : "reveal-pop"))}
+                    style={rv.active && rv.stage !== "typing" ? { animationDelay: `${Math.min(i, 4) * 70}ms` } : undefined}
+                  >
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm text-stone-600">
                         {m.mention_text ? (
@@ -512,7 +562,8 @@ export function ReviewEditor({ mode, initial, saveKey, reviewId, expectedUpdated
             </ul>
           </Card>
 
-          <Card className="order-6" title="Spiff preview" actions={calcBusy ? <Spinner className="text-stone-400" /> : null}>
+          <Card className="order-6" title="Spiff preview" actions={calcBusy && !rv.active ? <Spinner className="text-stone-400" /> : null}>
+            <div className={cx(rv.active && (rv.stage === "typing" || rv.stage === "chips") ? "reveal-hold" : rv.used && "reveal-show")}>
             {calcError && <Banner tone="error">{calcError}</Banner>}
             {!calc || calc.lines.length === 0 ? (
               <p className="text-stone-600">{selectedIds.length ? "Calculating…" : "No employees selected. Total $0.00."}</p>
@@ -529,14 +580,17 @@ export function ReviewEditor({ mode, initial, saveKey, reviewId, expectedUpdated
                 ))}
               </ul>
             )}
+            </div>
             <div className="mt-2 flex items-center justify-between border-t border-stone-200 pt-2 text-lg font-bold">
               <span>Review total</span>
-              <span className="text-brand tabular-nums">{formatCents(calc?.total_cents ?? 0)}</span>
+              <span className="text-brand tabular-nums">
+                <CountUp value={calc ? calc.total_cents : null} run={rv.stage === "count"} format={formatCents} />
+              </span>
             </div>
           </Card>
 
           {(calc?.duplicates.length || d.already_answered || d.needs_attention || !d.cleaner_confident) && (
-            <Card className="order-7" title="Warnings">
+            <Card className={cx("order-7", rv.active ? "reveal-hold" : rv.used && "reveal-show")} title="Warnings">
               <div className="space-y-2">
                 {calc?.duplicates.map((dup) => (
                   <Banner key={dup.review_id} tone={dup.kind === "strong" ? "error" : "warn"}>
@@ -577,14 +631,14 @@ export function ReviewEditor({ mode, initial, saveKey, reviewId, expectedUpdated
             </div>
           )}
           {blockers.length > 0 && (
-            <ul className="mb-2 space-y-0.5 text-sm text-amber-900">
+            <ul className={cx("mb-2 space-y-0.5 text-sm text-amber-900", rv.active ? "reveal-hold" : rv.used && "reveal-show")}>
               {blockers.slice(0, 3).map((b) => (
                 <li key={b}>• {b}</li>
               ))}
               {blockers.length > 3 && <li>• …and {blockers.length - 3} more</li>}
             </ul>
           )}
-          <Button variant="primary" size="xl" className="w-full" disabled={blockers.length > 0 || saving} onClick={() => save(false)}>
+          <Button variant="primary" size="xl" className="w-full" disabled={blockers.length > 0 || saving || rv.active} onClick={() => save(false)}>
             {saving && <Spinner />}
             {mode === "new" ? "Add all to records" : "Save changes"}
             {calc && !saving ? <span className="font-semibold opacity-80">· {formatCents(calc.total_cents)}</span> : null}
@@ -682,6 +736,162 @@ export function ReviewEditor({ mode, initial, saveKey, reviewId, expectedUpdated
         onConfirm={doDelete}
         onClose={() => setConfirmDelete(false)}
       />
+    </div>
+  );
+}
+
+/** The reply textarea's exact box (same element, empty and read-only) with content laid over its text area. */
+function ReplyBox({ children, scrollRef }: { children: ReactNode; scrollRef?: (el: HTMLElement | null) => void }) {
+  return (
+    <div className="relative" aria-hidden>
+      <textarea className={cx(inputCls, "min-h-44 leading-relaxed")} value="" readOnly tabIndex={-1} />
+      <div ref={scrollRef} className="absolute inset-x-0 top-0 h-44 overflow-hidden border border-transparent px-3.5 py-2.5 text-base leading-relaxed break-words whitespace-pre-wrap text-stone-900">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Loading skeleton ----------
+// Mirrors the ReviewEditor layout above (same cards, order classes and box sizes) so nothing jumps
+// when the editor takes over. Intro phases are pure CSS: silhouettes → card chrome → labels (~0.9s).
+
+function SkelCard({ title, actions, className, children }: { title: string; actions?: ReactNode; className?: string; children: ReactNode }) {
+  return (
+    <div className={cx("relative", className)}>
+      <div className="skel-silhouette absolute inset-0 rounded-2xl" aria-hidden />
+      <div className="skel-chrome relative">
+        <Card title={<span className="skel-label">{title}</span>} actions={actions ? <span className="skel-label flex flex-wrap items-center gap-2">{actions}</span> : undefined}>
+          {children}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+const SkelLabel = ({ children }: { children: ReactNode }) => <span className="skel-label mb-1 block text-sm font-semibold text-stone-700">{children}</span>;
+
+export function ReviewEditorSkeleton() {
+  return (
+    <div className="pb-48" inert aria-busy="true">
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:items-start">
+        <div className="contents lg:flex lg:flex-col lg:gap-4">
+          <SkelCard
+            className="order-1"
+            title="Company reply"
+            actions={
+              <Button size="sm" tabIndex={-1}>
+                ↻ Regenerate
+              </Button>
+            }
+          >
+            {/* Reserved at the textarea's exact height; the caret says "writing", not "stuck". */}
+            <ReplyBox>
+              <Caret blink />
+            </ReplyBox>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+              <span className="flex h-5 items-center">
+                <Bar className="h-3.5 w-28" />
+              </span>
+              <Button size="lg" variant="primary" className="skel-label w-full sm:w-auto" tabIndex={-1}>
+                Copy reply
+              </Button>
+            </div>
+          </SkelCard>
+          <div className="order-9">
+            <SkelCard
+              title="Review text"
+              actions={
+                <>
+                  <Button size="sm" tabIndex={-1}>Copy</Button>
+                  <Button size="sm" tabIndex={-1}>Edit</Button>
+                </>
+              }
+            >
+              <div className="space-y-2.5 py-0.5">
+                <Bar className="h-4 w-full" />
+                <Bar className="h-4 w-11/12" />
+                <Bar className="h-4 w-full" />
+                <Bar className="h-4 w-2/3" />
+              </div>
+            </SkelCard>
+          </div>
+        </div>
+
+        <div className="contents lg:flex lg:flex-col lg:gap-4">
+          {(
+            [
+              ["order-2", "Customer name", "w-40"],
+              ["order-3", "Posted date", "w-32"],
+            ] as const
+          ).map(([order, title, w]) => (
+            <div key={title} className={order}>
+              <SkelCard
+                title={title}
+                actions={
+                  <>
+                    <Button size="sm" tabIndex={-1}>Copy</Button>
+                    <Button size="sm" tabIndex={-1}>Edit</Button>
+                  </>
+                }
+              >
+                <div className="flex min-h-6 items-center">
+                  <Bar className={cx("h-4", w)} />
+                </div>
+              </SkelCard>
+            </div>
+          ))}
+
+          <SkelCard className="order-4" title="Rating & job type">
+            <div className="grid grid-cols-2 gap-3">
+              {["Stars", "Job type guess"].map((l) => (
+                <div key={l}>
+                  <SkelLabel>{l}</SkelLabel>
+                  {/* An empty select keeps the real control's height on every browser. */}
+                  <select className={cx(inputCls, "skel-label")} tabIndex={-1} aria-hidden defaultValue="">
+                    <option value="" />
+                  </select>
+                </div>
+              ))}
+            </div>
+          </SkelCard>
+
+          <SkelCard
+            className="order-5"
+            title="Employees mentioned"
+            actions={
+              <Button size="sm" variant="ghost" tabIndex={-1}>
+                + Add another employee
+              </Button>
+            }
+          >
+            <div className="rounded-xl bg-stone-50 p-3 ring-1 ring-stone-200">
+              <div className="mb-2 flex min-h-11 items-center">
+                <Bar className="h-3.5 w-44" />
+              </div>
+              <Bar className="h-11 w-56 rounded-xl" />
+            </div>
+          </SkelCard>
+
+          <SkelCard className="order-6" title="Spiff preview">
+            <div className="py-1">
+              <Bar className="h-4 w-48" />
+            </div>
+            <div className="mt-2 flex items-center justify-between border-t border-stone-200 pt-2 text-lg font-bold">
+              <span className="skel-label">Review total</span>
+              <Bar className="h-5 w-16" />
+            </div>
+          </SkelCard>
+        </div>
+      </div>
+
+      <div className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white/95 px-3 pt-3 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] backdrop-blur">
+        <div className="mx-auto max-w-6xl">
+          <Button variant="primary" size="xl" className="w-full" disabled>
+            Add all to records
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
