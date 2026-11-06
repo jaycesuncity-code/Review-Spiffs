@@ -29,8 +29,10 @@ export function App() {
   else if (settings) page = <Settings tab={settings[1] ?? "reply"} />;
   else page = <Home />;
 
+  const onDashboard = path === "/";
+
   const nav = (to: string, label: string, active: boolean) => (
-    <Link to={to} className={cx("inline-flex min-h-11 items-center rounded-xl px-3.5 text-sm font-bold transition", active ? "bg-white text-brand shadow-sm" : "text-white/85 hover:bg-white/10 hover:text-white")}>
+    <Link to={to} className={cx("inline-flex min-h-11 items-center rounded-xl px-3.5 font-bold transition", onDashboard ? "text-sm sm:text-[1.18125rem]" : "text-sm", active ? "bg-white text-brand shadow-sm" : "text-white/85 hover:bg-white/10 hover:text-white")}>
       {label}
     </Link>
   );
@@ -39,7 +41,7 @@ export function App() {
     <div className="min-h-dvh">
       <header className="pt-safe sticky top-0 z-30 bg-gradient-to-r from-brand to-brand-dark text-white shadow-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-1.5">
-          <Link to="/" className="flex min-h-11 items-center gap-2.5 text-lg font-extrabold tracking-tight">
+          <Link to="/" className={cx("flex min-h-11 items-center gap-2.5 font-extrabold tracking-tight", onDashboard ? "text-lg sm:text-[1.51875rem]" : "text-lg")}>
             <span className="inline-block size-6 rounded-full bg-gold ring-2 ring-white/30" aria-hidden />
             <span className="leading-tight">
               Review Spiffs <span className="hidden font-normal text-white/70 sm:inline">· Sun City</span>

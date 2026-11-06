@@ -49,7 +49,7 @@ export function DashCard({ title, icon, right, children, className }: { title: R
   return (
     <section className={cx("overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-stone-900/5", className)}>
       <header className="flex min-h-14 flex-wrap items-center justify-between gap-x-3 gap-y-2 bg-gradient-to-r from-brand to-brand-dark px-4 py-2 text-white sm:px-5">
-        <h2 className="flex items-center gap-2.5 text-xl font-extrabold tracking-tight">
+        <h2 className="flex items-center gap-2.5 text-[1.6875rem] font-extrabold tracking-tight">
           {icon}
           <span>{title}</span>
         </h2>
@@ -68,7 +68,7 @@ export function TotalCallout({ count, periodLabel, spiffText }: { count: number;
         <ReviewBubbleIcon className="size-9 text-white sm:size-10" />
       </span>
       <div className="min-w-0">
-        <p className="text-lg leading-tight font-bold">Total Reviews</p>
+        <p className="text-[1.51875rem] leading-tight font-bold">Total Reviews</p>
         <p className="text-6xl leading-none font-extrabold tracking-tight tabular-nums" aria-label={`${count} total reviews`}>
           {count}
         </p>
@@ -100,7 +100,7 @@ export function DepartmentGallery({ bars }: { bars: DepartmentBar[] }) {
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-3">
-                <p className="min-w-0 pt-0.5 text-base leading-tight font-bold text-stone-800">{d.name}</p>
+                <p className="min-w-0 pt-0.5 text-[1.35rem] leading-tight font-bold text-stone-800">{d.name}</p>
                 <p className="text-3xl leading-none font-extrabold tabular-nums text-stone-900">{d.count}</p>
               </div>
               <div
@@ -214,7 +214,7 @@ export function Leaderboard({ people, monthTitle }: { people: EmployeeTotal[]; m
       )}
       {ranked.length > 0 && (
         <div className="flex justify-end border-t border-stone-100 px-4 py-3 sm:px-5">
-          <Button size="sm" variant="primary" onClick={() => setOpen(true)}>
+          <Button size="sm" variant="primary" className="text-[1.18125rem]" onClick={() => setOpen(true)}>
             See all ({ranked.length}) <span aria-hidden>→</span>
           </Button>
         </div>
@@ -289,7 +289,7 @@ export function ReviewLog({ reviews, monthTitle, highlight, hlRef, onOpen }: { r
         </div>
       ) : (
         <div className="p-2.5 sm:p-3">
-          <div className={cx("grid items-center gap-x-2 rounded-xl bg-stone-800 px-3 py-1.5 text-sm font-bold text-white", COLS)}>
+          <div className={cx("grid items-center gap-x-2 rounded-xl bg-stone-800 px-3 py-1.5 text-[1.18125rem] font-bold text-white", COLS)}>
             <button type="button" className="flex min-h-9 items-center gap-1 text-left" onClick={() => setNewestFirst((v) => !v)} aria-label={`Date, sorted ${newestFirst ? "newest" : "oldest"} first. Tap to reverse.`}>
               Date <span aria-hidden>{newestFirst ? "▾" : "▴"}</span>
             </button>

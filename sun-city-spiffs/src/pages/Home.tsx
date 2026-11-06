@@ -70,20 +70,32 @@ export function Home() {
   return (
     <div className="pb-28 lg:pb-8">
       {/* Month switcher */}
-      <div className="mb-5 flex items-center justify-between gap-2">
-        <Button aria-label="Previous month" onClick={() => go(shiftMonth(month, -1))} className="w-12">
-          ‹
-        </Button>
-        <button type="button" className="min-h-11 flex-1 rounded-xl px-3 text-center text-2xl font-extrabold tracking-tight hover:bg-white" onClick={() => setMonthMenu(true)}>
-          {monthLabel(month)} <span className="text-base text-brand">▾</span>
-        </button>
-        <Button aria-label="Next month" onClick={() => go(shiftMonth(month, 1))} className="w-12">
-          ›
-        </Button>
-        <div className="hidden lg:block">
-          <Button variant="primary" size="lg" onClick={() => navigate("/new")}>
-            + Add Review
+      <div className="mb-5 flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="flex min-w-0 flex-1 items-center justify-center gap-1 sm:gap-2">
+          <Button aria-label="Previous month" onClick={() => go(shiftMonth(month, -1))} className="size-11 shrink-0 px-0 text-base sm:text-[1.35rem]">
+            ‹
           </Button>
+          <button type="button" className="min-h-11 shrink-0 whitespace-nowrap rounded-xl px-2 text-center text-2xl font-extrabold tracking-tight hover:bg-white sm:text-[2.025rem]" onClick={() => setMonthMenu(true)}>
+            {monthLabel(month)} <span className="align-middle text-base text-brand sm:text-[1.35rem]">▾</span>
+          </button>
+          <Button aria-label="Next month" onClick={() => go(shiftMonth(month, 1))} className="size-11 shrink-0 px-0 text-base sm:text-[1.35rem]">
+            ›
+          </Button>
+        </div>
+        <div className="flex w-full justify-end gap-2 sm:w-auto">
+          <a
+            href="https://www.google.com/maps/place/Sun+City+Plumbing+%26+Heating/@32.3105669,-106.8284786,1765m/data=!3m1!1e3!4m8!3m7!1s0x86de3df06f46ce5d:0xf29bb058af60f430!8m2!3d32.3105669!4d-106.8259037!9m1!1b1!16s%2Fg%2F1tdmw1mv?entry=ttu&g_ep=EgoyMDI2MTEwMy4wIKXMDSoASAFQAw%3D%3D"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-13 items-center justify-center whitespace-nowrap rounded-xl bg-white px-4 text-[1.35rem] font-semibold text-stone-800 shadow-sm ring-1 ring-stone-300/80 transition hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+          >
+            Link to Google
+          </a>
+          <div className="hidden lg:block">
+            <Button variant="primary" size="lg" className="text-[1.51875rem]" onClick={() => navigate("/new")}>
+              + Add Review
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -92,7 +104,7 @@ export function Home() {
           <Banner tone="ok">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="font-medium">Saved to records.</span>
-              <Button size="sm" variant="primary" onClick={() => navigate("/new")}>
+              <Button size="sm" variant="primary" className="text-[1.18125rem]" onClick={() => navigate("/new")}>
                 Add another
               </Button>
             </div>
@@ -125,7 +137,7 @@ export function Home() {
 
           {/* Spiff dollars live here, out of the way: payouts per person and the CSV exports. */}
           <Card>
-            <button type="button" className="flex min-h-11 w-full items-center justify-between text-left font-semibold" onClick={() => setShowTotals((s) => !s)} aria-expanded={showTotals}>
+            <button type="button" className="flex min-h-11 w-full items-center justify-between text-left text-[1.35rem] font-semibold" onClick={() => setShowTotals((s) => !s)} aria-expanded={showTotals}>
               <span>
                 Spiff payouts <span className="font-normal text-stone-500">· {formatCents(data.summary.total_cents)}</span>
               </span>
@@ -151,10 +163,10 @@ export function Home() {
                   <p className="py-2 text-sm text-stone-500">No spiffs this month.</p>
                 )}
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <a className="inline-flex min-h-11 items-center rounded-xl bg-white px-3 text-sm font-medium ring-1 ring-stone-300 hover:bg-stone-50" href={`/api/export?month=${month}&kind=mentions`} download>
+                  <a className="inline-flex min-h-11 items-center rounded-xl bg-white px-3 text-[1.18125rem] font-medium ring-1 ring-stone-300 hover:bg-stone-50" href={`/api/export?month=${month}&kind=mentions`} download>
                     Export CSV
                   </a>
-                  <a className="inline-flex min-h-11 items-center rounded-xl bg-white px-3 text-sm font-medium ring-1 ring-stone-300 hover:bg-stone-50" href={`/api/export?month=${month}&kind=totals`} download>
+                  <a className="inline-flex min-h-11 items-center rounded-xl bg-white px-3 text-[1.18125rem] font-medium ring-1 ring-stone-300 hover:bg-stone-50" href={`/api/export?month=${month}&kind=totals`} download>
                     Totals CSV
                   </a>
                 </div>
@@ -166,7 +178,7 @@ export function Home() {
 
       {/* Phone: big sticky Add New */}
       <div className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white/95 px-3 pt-3 backdrop-blur lg:hidden">
-        <Button variant="primary" size="xl" className="w-full" onClick={() => navigate("/new")}>
+        <Button variant="primary" size="xl" className="w-full text-[1.6875rem]" onClick={() => navigate("/new")}>
           + Add Review
         </Button>
       </div>
@@ -177,7 +189,7 @@ export function Home() {
             <li key={m}>
               <button
                 type="button"
-                className={cx("min-h-12 w-full rounded-xl px-3 text-left text-lg hover:bg-stone-100", m === month && "bg-brand-light font-semibold text-brand")}
+                className={cx("min-h-12 w-full rounded-xl px-3 text-left text-[1.51875rem] hover:bg-stone-100", m === month && "bg-brand-light font-semibold text-brand")}
                 onClick={() => {
                   setMonthMenu(false);
                   go(m);
