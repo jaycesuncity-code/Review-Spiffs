@@ -20,6 +20,14 @@ interface MonthData {
   };
 }
 
+// Keep one-time confirmation markers out of the URL after their display ends.
+function clearTransientParam(name: "saved" | "highlight", expected: string) {
+  const url = new URL(window.location.href);
+  if (url.searchParams.get(name) !== expected) return;
+  url.searchParams.delete(name);
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
 export function Home() {
   const { query, navigate } = useRouter();
   const qMonth = query.get("month");
@@ -32,6 +40,8 @@ export function Home() {
   const [months, setMonths] = useState<string[]>([]);
   const [monthMenu, setMonthMenu] = useState(false);
   const [showTotals, setShowTotals] = useState(false);
+  const [showSaved, setShowSaved] = useState(justSaved);
+  const [activeHighlight, setActiveHighlight] = useState(highlight);
   const hlRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -53,8 +63,29 @@ export function Home() {
   }, []);
 
   useEffect(() => {
-    if (data && highlight) hlRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    setShowSaved(justSaved);
+    if (!justSaved) return;
+    const timer = window.setTimeout(() => {
+      setShowSaved(false);
+      clearTransientParam("saved", "1");
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [justSaved]);
+
+  useEffect(() => {
+    setActiveHighlight(highlight);
+    // Wait for the log to load so the new row actually gets one second of highlighting.
+    if (!data || !highlight) return;
+    const timer = window.setTimeout(() => {
+      setActiveHighlight(0);
+      clearTransientParam("highlight", String(highlight));
+    }, 1000);
+    return () => window.clearTimeout(timer);
   }, [data, highlight]);
+
+  useEffect(() => {
+    if (data && activeHighlight) hlRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [data, activeHighlight]);
 
   const go = (m: string) => navigate(`/?month=${m}`);
 
@@ -99,7 +130,7 @@ export function Home() {
         </div>
       </div>
 
-      {justSaved && (
+      {showSaved && (
         <div className="mb-4">
           <Banner tone="ok">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -133,7 +164,7 @@ export function Home() {
 
           <Leaderboard people={data.summary.per_employee} monthTitle={monthLabel(month)} />
 
-          <ReviewLog reviews={data.reviews} monthTitle={monthLabel(month)} highlight={highlight} hlRef={hlRef} onOpen={(id) => navigate(`/entry/${id}`)} />
+          <ReviewLog reviews={data.reviews} monthTitle={monthLabel(month)} highlight={activeHighlight} hlRef={hlRef} onOpen={(id) => navigate(`/entry/${id}`)} />
 
           {/* Spiff dollars live here, out of the way: payouts per person and the CSV exports. */}
           <Card>
