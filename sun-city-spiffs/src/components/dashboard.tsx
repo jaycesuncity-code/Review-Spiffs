@@ -174,7 +174,7 @@ export function Leaderboard({ people, monthTitle }: { people: EmployeeTotal[]; m
   const pctOf = (n: number) => (total ? Math.round((n / total) * 1000) / 10 : 0);
 
   return (
-    <DashCard title="Top 5 Earners" icon={<TrophyIcon className="size-6" />} right="By review quantity">
+    <DashCard title="Top 5 Most Mentioned" icon={<TrophyIcon className="size-6" />}>
       {top.length === 0 ? (
         <p className="px-4 py-10 text-center text-stone-500">No employees named yet this month.</p>
       ) : (
