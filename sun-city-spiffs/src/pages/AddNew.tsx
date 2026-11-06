@@ -273,7 +273,7 @@ export function AddNew() {
             When was this review posted?
           </label>
           <input id="posted" type="date" required className={cx(inputCls, "max-w-xs")} value={posted} onChange={(e) => setPosted(e.target.value)} />
-          <p className="mt-2 text-sm text-stone-500">Google only shows “2 months ago”, so this date is the real one. Months group by it.</p>
+          <p className="mt-2 text-sm text-stone-500">Site defaults to today, but don't forget to change it if the review's a few days old</p>
         </Card>
       </div>
 
