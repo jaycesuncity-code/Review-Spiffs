@@ -5,7 +5,7 @@ import { HttpError } from "./http";
 
 const jwksByTeam = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 
-function teamUrl(raw: string): string {
+export function teamUrl(raw: string): string {
   const t = raw.trim().replace(/\/+$/, "");
   return t.startsWith("https://") ? t : `https://${t}`;
 }
@@ -14,13 +14,25 @@ function isLocalHost(hostname: string): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]" || hostname === "::1";
 }
 
+export interface AccessUser {
+  /** Verified email, lowercased. */
+  email: string;
+  /** The verified Access JWT, kept server-side only to look up this same user's identity. Null for the local dev bypass. */
+  token: string | null;
+}
+
 /** Returns the verified user email (lowercased), or null when the request is not authenticated. */
 export async function authenticate(req: Request, env: Env): Promise<string | null> {
+  return (await verifyAccess(req, env))?.email ?? null;
+}
+
+/** Verifies the request and returns the user, or null when the request is not authenticated. */
+export async function verifyAccess(req: Request, env: Env): Promise<AccessUser | null> {
   // Local development bypass: requires ENVIRONMENT=dev (only set in .dev.vars) AND a localhost URL.
   // A deployed Worker is never reached on localhost, so this can't be used in production.
   const url = new URL(req.url);
   if (env.ENVIRONMENT === "dev" && env.DEV_USER_EMAIL && isLocalHost(url.hostname)) {
-    return env.DEV_USER_EMAIL.trim().toLowerCase();
+    return { email: env.DEV_USER_EMAIL.trim().toLowerCase(), token: null };
   }
 
   const team = env.CF_ACCESS_TEAM_DOMAIN?.trim();
@@ -46,7 +58,7 @@ export async function authenticate(req: Request, env: Env): Promise<string | nul
     const { payload } = await jwtVerify(token, jwks, { issuer, audience: audiences, algorithms: ["RS256"] });
     const email = payload.email;
     if (typeof email !== "string" || !email.includes("@")) return null; // service tokens have no email
-    return email.toLowerCase();
+    return { email: email.toLowerCase(), token };
   } catch {
     return null;
   }

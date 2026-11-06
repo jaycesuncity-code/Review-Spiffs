@@ -1,10 +1,12 @@
 import { todayDenver } from "../shared/dates";
+import { parsePeriodParams, type ExportPeriod } from "../shared/period";
 import { handleAnalyze } from "./analyze";
 import { handleRewrite } from "./rewrite";
-import { authenticate } from "./auth";
+import { verifyAccess, type AccessUser } from "./auth";
 import { getSettings } from "./db";
 import type { Env } from "./env";
 import { errorResponse, HttpError, json, parseId, readJson } from "./http";
+import { resolveFullName } from "./identity";
 import { createExample, deleteExample, listChangeLog, listExamples, putSettings, updateExample } from "./routes/admin";
 import {
   createEmployee,
@@ -15,17 +17,27 @@ import {
   updateDepartment,
   updateEmployee,
 } from "./routes/directory";
-import { calcPreview, createReview, deleteReview, exportCsv, listMonths, listReviews, loadReview, updateReview } from "./routes/reviews";
+import { calcPreview, createReview, deleteReview, exportCsv, listMonths, listReviews, loadReview, reportData, updateReview } from "./routes/reviews";
 import { z } from "zod";
 
-type Ctx = { req: Request; env: Env; url: URL; user: string; params: string[] };
+type Ctx = { req: Request; env: Env; url: URL; user: string; access: AccessUser; params: string[] };
 type Handler = (c: Ctx) => Promise<Response>;
 
 const anyJson = z.unknown();
 const body = (c: Ctx) => readJson(c.req, anyJson);
 
+function exportPeriod(url: URL): ExportPeriod {
+  const r = parsePeriodParams(url.searchParams);
+  if (!r.ok) throw new HttpError(400, r.error);
+  return r.period;
+}
+
 const routes: [string, RegExp, Handler][] = [
-  ["GET", /^\/api\/me$/, async (c) => json({ email: c.user, environment: c.env.ENVIRONMENT ?? "production", today: todayDenver() })],
+  [
+    "GET",
+    /^\/api\/me$/,
+    async (c) => json({ email: c.user, full_name: await resolveFullName(c.env, c.access), environment: c.env.ENVIRONMENT ?? "production", today: todayDenver() }),
+  ],
   ["GET", /^\/api\/months$/, async (c) => json(await listMonths(c.env.DB))],
   ["GET", /^\/api\/reviews$/, async (c) => json(await listReviews(c.env.DB, c.url.searchParams.get("month") ?? ""))],
   [
@@ -43,7 +55,8 @@ const routes: [string, RegExp, Handler][] = [
   ["POST", /^\/api\/analyze$/, async (c) => json(await handleAnalyze(c.env, c.user, await body(c)))],
   ["POST", /^\/api\/rewrite$/, async (c) => json(await handleRewrite(c.env, c.user, await body(c)))],
   ["POST", /^\/api\/calc$/, async (c) => json(await calcPreview(c.env, await body(c)))],
-  ["GET", /^\/api\/export$/, async (c) => exportCsv(c.env.DB, c.url.searchParams.get("month") ?? "", c.url.searchParams.get("kind") ?? "mentions")],
+  ["GET", /^\/api\/export$/, async (c) => exportCsv(c.env.DB, exportPeriod(c.url), c.url.searchParams.get("kind") ?? "mentions")],
+  ["GET", /^\/api\/report$/, async (c) => json(await reportData(c.env.DB, exportPeriod(c.url)))],
 
   ["GET", /^\/api\/employees$/, async (c) => json(await listEmployees(c.env.DB, c.url))],
   ["POST", /^\/api\/employees$/, async (c) => json(await createEmployee(c.env, c.user, await body(c)), 201)],
@@ -79,13 +92,13 @@ const SECURITY_HEADERS: Record<string, string> = {
   "X-Frame-Options": "DENY",
 };
 
-async function handleApi(req: Request, env: Env, url: URL, user: string): Promise<Response> {
+async function handleApi(req: Request, env: Env, url: URL, access: AccessUser): Promise<Response> {
   assertSameOrigin(req, url);
   for (const [method, pattern, handler] of routes) {
     const m = url.pathname.match(pattern);
     if (!m) continue;
     if (req.method !== method) continue;
-    return handler({ req, env, url, user, params: m.slice(1) });
+    return handler({ req, env, url, user: access.email, access, params: m.slice(1) });
   }
   const pathExists = routes.some(([, p]) => p.test(url.pathname));
   throw new HttpError(pathExists ? 405 : 404, pathExists ? "Method not allowed" : "Not found");
@@ -96,7 +109,7 @@ export default {
     const url = new URL(req.url);
     const isApi = url.pathname.startsWith("/api/");
     try {
-      const user = await authenticate(req, env);
+      const user = await verifyAccess(req, env);
       if (!user) {
         return isApi
           ? json({ error: "Not signed in. Reload the page to sign in through Cloudflare Access." }, 401)

@@ -1,4 +1,7 @@
+import type { EmployeeTotal } from "../../shared/dashboard";
 import { currentMonthDenver, isValidMonth } from "../../shared/dates";
+import { periodSlug, toPeriod, type ExportPeriod } from "../../shared/period";
+import type { ReportData, ReportMention, ReportReview } from "../../shared/report";
 import { CalcBody, CreateReviewBody, UpdateReviewBody, type CalcResult, type Review, type ReviewMention } from "../../shared/schemas";
 import { formatCents, wordCount } from "../../shared/text";
 import { cleanReviewPaste } from "../cleaner";
@@ -483,9 +486,16 @@ function csvCell(v: unknown): string {
 const csv = (rows: unknown[][]) => rows.map((r) => r.map(csvCell).join(",")).join("\r\n") + "\r\n";
 const dollars = (c: number) => (c / 100).toFixed(2);
 
-export async function exportCsv(db: D1Database, month: string, kind: string): Promise<Response> {
-  if (!isValidMonth(month)) throw new HttpError(400, "month must be YYYY-MM");
-  const like = `${month}-%`;
+/** SQL bounds for an export period. A month keeps the original LIKE filter so legacy month exports are unchanged. */
+function periodWhere(p: ExportPeriod): { sql: string; params: string[] } {
+  return p.kind === "month"
+    ? { sql: "r.posted_date LIKE ?", params: [`${p.month}-%`] }
+    : { sql: "r.posted_date >= ? AND r.posted_date <= ?", params: [p.start, p.end] };
+}
+
+export async function exportCsv(db: D1Database, period: ExportPeriod, kind: string): Promise<Response> {
+  const where = periodWhere(period);
+  const slug = periodSlug(period);
   let body: string;
   let name: string;
   if (kind === "totals") {
@@ -494,33 +504,88 @@ export async function exportCsv(db: D1Database, month: string, kind: string): Pr
         `SELECT e.full_name AS name, d.name AS department, COUNT(*) AS mentions, SUM(m.amount_cents) AS total_cents
          FROM review_mentions m JOIN reviews r ON r.id = m.review_id
          JOIN employees e ON e.id = m.employee_id JOIN departments d ON d.id = e.department_id
-         WHERE r.posted_date LIKE ? GROUP BY m.employee_id ORDER BY e.full_name COLLATE NOCASE`,
+         WHERE ${where.sql} GROUP BY m.employee_id ORDER BY e.full_name COLLATE NOCASE`,
       )
-      .bind(like)
+      .bind(...where.params)
       .all<{ name: string; department: string; mentions: number; total_cents: number }>();
     body = csv([["employee", "department", "mentions", "total"], ...results.map((r) => [r.name, r.department, r.mentions, dollars(r.total_cents)])]);
-    name = `spiff-totals-${month}.csv`;
+    name = `spiff-totals-${slug}.csv`;
   } else {
     const { results } = await db
       .prepare(
         `SELECT r.posted_date, r.customer_name, m.employee_name_snapshot AS employee, m.department_name_snapshot AS department,
                 m.spiff_type_snapshot AS type, m.amount_cents
          FROM review_mentions m JOIN reviews r ON r.id = m.review_id
-         WHERE r.posted_date LIKE ? ORDER BY r.posted_date, r.id, m.id`,
+         WHERE ${where.sql} ORDER BY r.posted_date, r.id, m.id`,
       )
-      .bind(like)
+      .bind(...where.params)
       .all<{ posted_date: string; customer_name: string; employee: string; department: string; type: string; amount_cents: number }>();
     body = csv([
       ["posted_date", "customer", "employee", "department", "type", "amount"],
       ...results.map((r) => [r.posted_date, r.customer_name, r.employee, r.department, r.type, dollars(r.amount_cents)]),
     ]);
-    name = `spiff-mentions-${month}.csv`;
+    name = `spiff-mentions-${slug}.csv`;
   }
   return new Response(body, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${name}"`,
       "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
     },
   });
+}
+
+// ---------- PDF report data (read-only) ----------
+/**
+ * Everything the PDF needs for an inclusive posted_date range, read in one batch so all parts
+ * come from the same snapshot. Employee totals use CURRENT names/departments (like the totals CSV);
+ * mentions carry their saved HISTORICAL snapshots. `summary` is counted independently as a cross-check.
+ */
+export async function reportData(db: D1Database, period: ExportPeriod): Promise<ReportData> {
+  const { start, end } = toPeriod(period);
+  const range = "posted_date >= ? AND posted_date <= ?";
+  const rRange = "r.posted_date >= ? AND r.posted_date <= ?";
+  const [reviews, mentions, perEmployee, summary] = await db.batch([
+    db.prepare(`SELECT id, posted_date, customer_name, star_rating FROM reviews WHERE ${range} ORDER BY posted_date, id`).bind(start, end),
+    db
+      .prepare(
+        `SELECT m.id, m.review_id, m.employee_id, m.employee_name_snapshot, m.department_name_snapshot, m.amount_cents
+         FROM review_mentions m JOIN reviews r ON r.id = m.review_id
+         WHERE ${rRange} ORDER BY m.review_id, m.id`,
+      )
+      .bind(start, end),
+    db
+      .prepare(
+        `SELECT m.employee_id, e.full_name AS name, d.name AS department, COUNT(*) AS mentions, SUM(m.amount_cents) AS total_cents
+         FROM review_mentions m
+         JOIN reviews r ON r.id = m.review_id
+         JOIN employees e ON e.id = m.employee_id
+         JOIN departments d ON d.id = e.department_id
+         WHERE ${rRange}
+         GROUP BY m.employee_id
+         ORDER BY total_cents DESC, e.full_name COLLATE NOCASE`,
+      )
+      .bind(start, end),
+    db
+      .prepare(
+        `SELECT (SELECT COUNT(*) FROM reviews WHERE ${range}) AS count,
+                (SELECT COUNT(*) FROM review_mentions m JOIN reviews r ON r.id = m.review_id WHERE ${rRange}) AS mentions,
+                (SELECT COALESCE(SUM(m.amount_cents), 0) FROM review_mentions m JOIN reviews r ON r.id = m.review_id WHERE ${rRange}) AS total_cents`,
+      )
+      .bind(start, end, start, end, start, end),
+  ]);
+  const byReview = new Map<number, ReportMention[]>();
+  for (const m of mentions.results as (ReportMention & { review_id: number })[]) {
+    const { review_id, ...mention } = m;
+    byReview.set(review_id, [...(byReview.get(review_id) ?? []), mention]);
+  }
+  const s = summary.results[0] as { count: number; mentions: number; total_cents: number } | undefined;
+  return {
+    start,
+    end,
+    reviews: (reviews.results as Omit<ReportReview, "mentions">[]).map((r) => ({ ...r, mentions: byReview.get(r.id) ?? [] })),
+    per_employee: perEmployee.results as EmployeeTotal[],
+    summary: { count: s?.count ?? 0, mentions: s?.mentions ?? 0, total_cents: s?.total_cents ?? 0 },
+  };
 }

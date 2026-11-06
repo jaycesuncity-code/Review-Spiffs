@@ -105,7 +105,36 @@ export function CopyButton({ text, label = "Copy", size = "sm", variant = "secon
   );
 }
 
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 export function Modal({ open, onClose, title, children, footer, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Focus moves into the dialog when it opens, Tab stays inside it, and focus returns to whatever opened it.
+  useEffect(() => {
+    if (!open) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialogRef.current?.focus({ preventScroll: true });
+    const onTab = (e: KeyboardEvent) => {
+      const el = dialogRef.current;
+      if (e.key !== "Tab" || !el) return;
+      const items = [...el.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((x) => x.offsetParent !== null);
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === el)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    addEventListener("keydown", onTab);
+    return () => {
+      removeEventListener("keydown", onTab);
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
+    };
+  }, [open]);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -121,11 +150,13 @@ export function Modal({ open, onClose, title, children, footer, wide }: { open: 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onClick={onClose} role="presentation">
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
-        className={cx("flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:rounded-2xl", wide ? "sm:max-w-2xl" : "sm:max-w-lg")}
+        className={cx("flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl outline-none sm:rounded-2xl", wide ? "sm:max-w-2xl" : "sm:max-w-lg")}
       >
         <OnDark.Provider value>
           <div className="flex items-center justify-between gap-2 bg-gradient-to-r from-brand to-brand-dark px-4 py-2 text-white">

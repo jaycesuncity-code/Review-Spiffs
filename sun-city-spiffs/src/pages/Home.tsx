@@ -5,7 +5,8 @@ import type { Review } from "../../shared/schemas";
 import { formatCents } from "../../shared/text";
 import { api } from "../api";
 import { DepartmentGallery, Leaderboard, ReviewLog, TotalCallout } from "../components/dashboard";
-import { Banner, Button, Card, Modal, Spinner } from "../components/ui";
+import { ExportModal } from "../components/ExportModal";
+import { Banner, Button, Modal, Spinner } from "../components/ui";
 import { useDirectory } from "../directory";
 import { cx } from "../lib";
 import { useRouter } from "../router";
@@ -39,7 +40,7 @@ export function Home() {
   const [error, setError] = useState<string | null>(null);
   const [months, setMonths] = useState<string[]>([]);
   const [monthMenu, setMonthMenu] = useState(false);
-  const [showTotals, setShowTotals] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [showSaved, setShowSaved] = useState(justSaved);
   const [activeHighlight, setActiveHighlight] = useState(highlight);
   const hlRef = useRef<HTMLButtonElement>(null);
@@ -166,44 +167,23 @@ export function Home() {
 
           <ReviewLog reviews={data.reviews} monthTitle={monthLabel(month)} highlight={activeHighlight} hlRef={hlRef} onOpen={(id) => navigate(`/entry/${id}`)} />
 
-          {/* Spiff dollars live here, out of the way: payouts per person and the CSV exports. */}
-          <Card>
-            <button type="button" className="flex min-h-11 w-full items-center justify-between text-left text-[1.35rem] font-semibold" onClick={() => setShowTotals((s) => !s)} aria-expanded={showTotals}>
-              <span>
-                Spiff payouts <span className="font-normal text-stone-500">· {formatCents(data.summary.total_cents)}</span>
+          {/* One way out for every report: the PDF and both CSVs, for any month or date range. */}
+          <div className="flex justify-center pt-1">
+            <button
+              type="button"
+              onClick={() => setExportOpen(true)}
+              aria-haspopup="dialog"
+              className="group inline-flex min-h-18 w-full items-center justify-center gap-3.5 rounded-2xl bg-gradient-to-r from-brand to-brand-dark px-10 text-[1.6875rem] font-extrabold tracking-[0.2em] text-white shadow-lg shadow-brand/30 ring-1 ring-brand-dark/50 transition hover:-translate-y-0.5 hover:shadow-xl hover:shadow-brand/35 active:translate-y-0 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-gold sm:w-auto sm:min-w-[26rem]"
+            >
+              <span className="flex size-10 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/25 transition group-hover:bg-white/20" aria-hidden>
+                <svg viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5" />
+                  <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" stroke="#c9a84c" />
+                </svg>
               </span>
-              <span className="text-stone-400">{showTotals ? "▴" : "▾"}</span>
+              EXPORT
             </button>
-            {showTotals && (
-              <div className="mt-2 border-t border-stone-100 pt-2">
-                {data.summary.per_employee.length > 0 ? (
-                  <ul className="divide-y divide-stone-100">
-                    {data.summary.per_employee.map((p) => (
-                      <li key={p.employee_id} className="flex items-center justify-between gap-3 py-2">
-                        <div className="min-w-0">
-                          <p className="truncate font-medium">{p.name}</p>
-                          <p className="text-xs text-stone-500">
-                            {p.department} · {p.mentions} review{p.mentions === 1 ? "" : "s"}
-                          </p>
-                        </div>
-                        <p className="font-semibold tabular-nums">{formatCents(p.total_cents)}</p>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="py-2 text-sm text-stone-500">No spiffs this month.</p>
-                )}
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <a className="inline-flex min-h-11 items-center rounded-xl bg-white px-3 text-[1.18125rem] font-medium ring-1 ring-stone-300 hover:bg-stone-50" href={`/api/export?month=${month}&kind=mentions`} download>
-                    Export CSV
-                  </a>
-                  <a className="inline-flex min-h-11 items-center rounded-xl bg-white px-3 text-[1.18125rem] font-medium ring-1 ring-stone-300 hover:bg-stone-50" href={`/api/export?month=${month}&kind=totals`} download>
-                    Totals CSV
-                  </a>
-                </div>
-              </div>
-            )}
-          </Card>
+          </div>
         </div>
       )}
 
@@ -213,6 +193,8 @@ export function Home() {
           + Add Review
         </Button>
       </div>
+
+      {exportOpen && <ExportModal initialMonth={month} months={months} onClose={() => setExportOpen(false)} />}
 
       <Modal open={monthMenu} onClose={() => setMonthMenu(false)} title="Choose a month">
         <ul className="space-y-1">

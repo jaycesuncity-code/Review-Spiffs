@@ -63,6 +63,14 @@ CF_ACCESS_AUD = "<aud tag>"            # comma-separate if more than one Access 
 ```
 `preview_urls = false` is already set, so preview links can't bypass Access.
 
+### 4b. "Prepared by" names on PDF reports
+Exported PDFs print **Prepared by: <full name>** for the signed-in person. The name always comes from the server, tied to the email Access verified, in this order:
+1. The `PREPARED_BY_NAMES` Worker **secret**, if set: JSON like `{"jayce@company.com":"Jayce Lastname"}` (Worker → Settings → Variables and Secrets → type **Secret**, so deploys keep it).
+2. The identity provider's `name` from Cloudflare Access (`/cdn-cgi/access/get-identity`). Microsoft Entra ID sends it; the one-time-PIN login does not.
+3. Local dev only: `DEV_USER_NAME` in `.dev.vars`.
+
+If none gives a name, the app refuses to build the PDF and says why. It never guesses a name from an email address. CSV exports don't need a name.
+
 ### 5. Open the app
 Sign in through Access. The footer shows "Signed in as you@…". First things to check: **Settings → Employees** (see the note on Jermaine Yancey below), then add a test review.
 
@@ -79,7 +87,7 @@ Add a new file in `migrations/` (`0003_something.sql`), then either:
 ## Local development
 ```bash
 npm install
-cp .dev.vars.example .dev.vars          # ENVIRONMENT=dev, DEV_USER_EMAIL, OPENAI_API_KEY
+cp .dev.vars.example .dev.vars          # ENVIRONMENT=dev, DEV_USER_EMAIL, DEV_USER_NAME, OPENAI_API_KEY
 npm run db:migrate:local                # local D1 in .wrangler/
 npm run dev                             # build + wrangler dev on http://localhost:8787
 # or, with hot reload: `npm run dev:api` in one terminal and `npm run dev:web` (http://localhost:5173) in another
