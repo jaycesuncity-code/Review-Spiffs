@@ -42,7 +42,7 @@ export function App() {
       <header className="pt-safe sticky top-0 z-30 bg-gradient-to-r from-brand to-brand-dark text-white shadow-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-1.5">
           <Link to="/" className={cx("flex min-h-11 min-w-0 items-center gap-2.5 font-extrabold tracking-tight", onDashboard ? "text-[1.575rem] sm:text-[2.12625rem]" : "text-[1.575rem]")}>
-            <img src="/sc-logo.png" alt="Sun City logo" className="size-8 shrink-0 rounded-full object-contain sm:size-9" />
+            <img src="/sc-logo-2026.png" alt="Sun City logo" className="size-8 shrink-0 rounded-full object-contain sm:size-9" />
             <span className="leading-tight">Google Review Spiff Page</span>
           </Link>
           <nav className="flex items-center gap-1">
